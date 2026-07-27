@@ -31,7 +31,7 @@ export default async function SkillsPage() {
               <p className="mt-3 text-sm text-zinc-600 dark:text-zinc-400">{skill.description}</p>
               <p className="mt-4 text-sm text-zinc-500">↓ {skill.downloads}</p>
               <div className="mt-3 flex gap-2">
-                {(skill.tags ?? []).map((tag) => (
+                {(skill.tags ?? []).map((tag: string) => (
                   <span key={tag} className="rounded bg-blue-100 dark:bg-blue-500/10 px-2 py-0.5 text-xs font-mono text-blue-700 dark:text-blue-300">{tag}</span>
                 ))}
               </div>
