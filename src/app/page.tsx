@@ -1,65 +1,98 @@
-import Image from "next/image";
+// 这是首页文件。下面的代码描述了页面上要显示什么、长什么样。
 
-export default function Home() {
+// 从我们刚写的连接文件里，拿到访问数据库的通道
+import { supabase } from "@/lib/supabase";
+import CreateMenu from "@/components/CreateMenu";
+import ThemeToggle from "@/components/ThemeToggle";
+
+// 注意这里多了 async —— 意思是"这个页面需要等数据库回话"
+export default async function Home() {
+
+  // 👇 去数据库问一句："skills 表里的数据，按下载量从高到低给我"
+  const { data: trendingSkills } = await supabase
+    .from("skills")           // 从 skills 这张表
+    .select("*")              // 要所有列
+    .order("downloads", { ascending: false }); // 按下载量从高到低排
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
+    // 整个页面：深色背景（接近黑），文字浅色
+    <div className="min-h-screen bg-white dark:bg-[#0a0e14] text-zinc-900 dark:text-zinc-100">
+
+      {/* ===== 顶部导航栏 ===== */}
+      <header className="flex items-center gap-6 px-8 py-4 border-b border-zinc-200 dark:border-zinc-800">
+        {/* 左边：蓝色 Logo */}
+        <div className="text-2xl font-bold text-blue-500 dark:text-blue-400">SkillHub</div>
+        {/* 中间：搜索框 */}
+        <input
+          type="text"
+          placeholder="🔍 搜索 Skills、Agents、框架..."
+          className="flex-1 max-w-xl rounded-md bg-zinc-100 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 px-4 py-2 text-sm text-zinc-900 dark:text-zinc-200 placeholder-zinc-500"
         />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+        {/* 右边：导航链接 + 按钮 */}
+        <nav className="flex items-center gap-5 text-sm text-zinc-600 dark:text-zinc-300">
+          <a href="/skills" className="hover:text-zinc-900 dark:hover:text-white">Skills</a>
+          <a href="/agents" className="hover:text-zinc-900 dark:hover:text-white">Agents</a>
+          <a href="/forum" className="hover:text-zinc-900 dark:hover:text-white">论坛</a>
+          <CreateMenu />
+          <ThemeToggle />
+          <a href="/login" className="hover:text-zinc-900 dark:hover:text-white">登录</a>
+          <a href="/register" className="rounded-md bg-green-600 px-4 py-1.5 font-medium text-white hover:bg-green-500">注册</a>
+        </nav>
+      </header>
+
+      {/* ===== 中间的大标题区 ===== */}
+      <section className="flex flex-col items-center text-center py-20 px-4">
+        <h1 className="text-5xl font-extrabold tracking-tight">
+          <span className="text-blue-500 dark:text-blue-400">AI Agent 技能</span>
+          <span className="text-zinc-900 dark:text-white">的开放注册中心</span>
+        </h1>
+        <p className="mt-5 text-lg text-zinc-500 dark:text-zinc-400">发现、发布、分享你的 Agent Skill</p>
+
+        {/* 两个按钮 */}
+        <div className="mt-8 flex gap-4">
+          <a href="/skills" className="rounded-md bg-green-600 px-6 py-3 font-medium text-white hover:bg-green-500">浏览全部</a>
+          <a href="/publish" className="rounded-md border border-zinc-300 dark:border-zinc-600 px-6 py-3 hover:bg-zinc-100 dark:hover:bg-zinc-800">发布你的第一个 Skill →</a>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+
+        {/* 三个统计 */}
+        <div className="mt-10 flex gap-10 text-sm font-medium text-zinc-600 dark:text-zinc-400">
+          <a href="/skills" className="hover:text-blue-600 dark:hover:text-blue-400">📦 Skills</a>
+          <a href="/agents" className="hover:text-blue-600 dark:hover:text-blue-400">🤖 Agents</a>
+          <a href="/forum" className="hover:text-blue-600 dark:hover:text-blue-400">💬 论坛</a>
         </div>
-      </main>
+      </section>
+
+      {/* ===== 本周趋势 Skill ===== */}
+      <section className="max-w-6xl mx-auto px-8 pb-20">
+        {/* 标题行：左边标题，右边"查看全部" */}
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-xl font-bold">🔥 本周趋势 Skill</h2>
+          <a href="/skills" className="text-sm text-blue-600 dark:text-blue-400 hover:underline">查看全部 →</a>
+        </div>
+
+        {/* 卡片网格：一行 3 个 */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+          {(trendingSkills ?? []).map((skill) => (
+            <div key={skill.name} className="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/40 p-5 hover:border-zinc-300 dark:hover:border-zinc-600">
+              {/* 名字 + 版本 */}
+              <div className="flex items-start justify-between">
+                <span className="font-mono text-blue-600 dark:text-blue-300">{skill.name}</span>
+                <span className="text-xs text-zinc-400 dark:text-zinc-500">{skill.version}</span>
+              </div>
+              {/* 描述 */}
+              <p className="mt-3 text-sm text-zinc-600 dark:text-zinc-400">{skill.description}</p>
+              {/* 下载量 */}
+              <p className="mt-4 text-sm text-zinc-500">↓ {skill.downloads}</p>
+              {/* 标签 */}
+              <div className="mt-3 flex gap-2">
+                {skill.tags.map((tag) => (
+                  <span key={tag} className="rounded bg-blue-100 dark:bg-blue-500/10 px-2 py-0.5 text-xs font-mono text-blue-700 dark:text-blue-300">{tag}</span>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
     </div>
   );
 }
