@@ -1,6 +1,23 @@
 alter table public.agents add column if not exists user_id uuid references auth.users(id) on delete set null;
 alter table public.skills add column if not exists user_id uuid references auth.users(id) on delete set null;
 alter table public.posts add column if not exists user_id uuid references auth.users(id) on delete set null;
+alter table public.posts add column if not exists content text;
+
+alter table public.agents enable row level security;
+alter table public.skills enable row level security;
+alter table public.posts enable row level security;
+
+grant select on public.agents, public.skills, public.posts to anon, authenticated;
+grant insert, update, delete on public.agents, public.skills, public.posts to authenticated;
+
+drop policy if exists "Anyone can read agents" on public.agents;
+create policy "Anyone can read agents" on public.agents for select using (true);
+
+drop policy if exists "Anyone can read skills" on public.skills;
+create policy "Anyone can read skills" on public.skills for select using (true);
+
+drop policy if exists "Anyone can read posts" on public.posts;
+create policy "Anyone can read posts" on public.posts for select using (true);
 
 create index if not exists agents_user_id_created_at_idx on public.agents (user_id, created_at desc);
 create index if not exists skills_user_id_created_at_idx on public.skills (user_id, created_at desc);

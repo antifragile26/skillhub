@@ -118,15 +118,6 @@ export default function NewAgentPage() {
           />
         </div>
 
-        <section className="flex min-h-44 flex-col items-center justify-center rounded-lg border-2 border-dashed border-zinc-300 bg-white px-6 text-center dark:border-zinc-700 dark:bg-[#0f141c]">
-          <div className="text-4xl">🤖</div>
-          <p className="mt-4 text-zinc-600 dark:text-zinc-300">上传 Agent 包，或只填写仓库入口</p>
-          <label className="mt-1 cursor-pointer text-blue-600 hover:underline dark:text-blue-400">
-            选择文件
-            <input type="file" accept=".zip,.tar.gz,.tgz" className="sr-only" />
-          </label>
-        </section>
-
         {message && <p className="text-sm text-red-600 dark:text-red-400">{message}</p>}
 
         <div className="flex justify-end gap-4">
