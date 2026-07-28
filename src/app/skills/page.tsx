@@ -28,7 +28,7 @@ export default async function SkillsPage() {
         {/* 标题行（与 Agent 页一致：左标题 + 右侧发布按钮） */}
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-3xl font-bold">Skill 目录</h1>
-          <Link href="/publish" className="rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-500">发布 Skill</Link>
+          <Link href="/publish" className="rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-500">发布我的 Skill</Link>
         </div>
 
         <SkillsBrowser skills={skills ?? []} />
