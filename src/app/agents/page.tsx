@@ -1,6 +1,8 @@
 import { supabase } from "@/lib/supabase";
 import CreateMenu from "@/components/CreateMenu";
 import ThemeToggle from "@/components/ThemeToggle";
+import AuthControls from "@/components/AuthControls";
+import Link from "next/link";
 
 export default async function AgentsPage() {
   // 去数据库读所有 agent
@@ -10,15 +12,14 @@ export default async function AgentsPage() {
     <div className="min-h-screen bg-white dark:bg-[#0a0e14] text-zinc-900 dark:text-zinc-100">
       {/* 简单的顶部（返回首页） */}
       <header className="flex items-center gap-6 px-8 py-4 border-b border-zinc-200 dark:border-zinc-800">
-        <a href="/" className="text-2xl font-bold text-blue-500 dark:text-blue-400">SkillHub</a>
+        <Link href="/" className="text-2xl font-bold text-blue-500 dark:text-blue-400">SkillHub</Link>
         <nav className="ml-auto flex items-center gap-5 text-sm text-zinc-600 dark:text-zinc-300">
-          <a href="/skills" className="hover:text-zinc-900 dark:hover:text-white">Skills</a>
-          <a href="/agents" className="hover:text-zinc-900 dark:hover:text-white">Agents</a>
-          <a href="/forum" className="hover:text-zinc-900 dark:hover:text-white">论坛</a>
+          <Link href="/skills" className="hover:text-zinc-900 dark:hover:text-white">Skills</Link>
+          <Link href="/agents" className="hover:text-zinc-900 dark:hover:text-white">Agents</Link>
+          <Link href="/forum" className="hover:text-zinc-900 dark:hover:text-white">论坛</Link>
           <CreateMenu />
           <ThemeToggle />
-          <a href="/login" className="hover:text-zinc-900 dark:hover:text-white">登录</a>
-          <a href="/register" className="rounded-md bg-green-600 px-4 py-1.5 font-medium text-white hover:bg-green-500">注册</a>
+          <AuthControls />
         </nav>
       </header>
 
@@ -26,7 +27,7 @@ export default async function AgentsPage() {
         {/* 标题行 */}
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-3xl font-bold">Agent 目录</h1>
-          <a href="/agents/new" className="rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-500">创建我的 Agent</a>
+          <Link href="/agents/new" className="rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-500">创建我的 Agent</Link>
         </div>
 
         {/* 筛选标签（先做成静态的样子） */}

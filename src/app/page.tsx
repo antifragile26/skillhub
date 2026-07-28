@@ -4,6 +4,8 @@
 import { supabase } from "@/lib/supabase";
 import CreateMenu from "@/components/CreateMenu";
 import ThemeToggle from "@/components/ThemeToggle";
+import AuthControls from "@/components/AuthControls";
+import Link from "next/link";
 
 // 注意这里多了 async —— 意思是"这个页面需要等数据库回话"
 export default async function Home() {
@@ -30,13 +32,12 @@ export default async function Home() {
         />
         {/* 右边：导航链接 + 按钮 */}
         <nav className="flex items-center gap-5 text-sm text-zinc-600 dark:text-zinc-300">
-          <a href="/skills" className="hover:text-zinc-900 dark:hover:text-white">Skills</a>
-          <a href="/agents" className="hover:text-zinc-900 dark:hover:text-white">Agents</a>
-          <a href="/forum" className="hover:text-zinc-900 dark:hover:text-white">论坛</a>
+          <Link href="/skills" className="hover:text-zinc-900 dark:hover:text-white">Skills</Link>
+          <Link href="/agents" className="hover:text-zinc-900 dark:hover:text-white">Agents</Link>
+          <Link href="/forum" className="hover:text-zinc-900 dark:hover:text-white">论坛</Link>
           <CreateMenu />
           <ThemeToggle />
-          <a href="/login" className="hover:text-zinc-900 dark:hover:text-white">登录</a>
-          <a href="/register" className="rounded-md bg-green-600 px-4 py-1.5 font-medium text-white hover:bg-green-500">注册</a>
+          <AuthControls />
         </nav>
       </header>
 
@@ -50,15 +51,15 @@ export default async function Home() {
 
         {/* 两个按钮 */}
         <div className="mt-8 flex gap-4">
-          <a href="/skills" className="rounded-md bg-green-600 px-6 py-3 font-medium text-white hover:bg-green-500">浏览全部</a>
-          <a href="/publish" className="rounded-md border border-zinc-300 dark:border-zinc-600 px-6 py-3 hover:bg-zinc-100 dark:hover:bg-zinc-800">发布你的第一个 Skill →</a>
+          <Link href="/skills" className="rounded-md bg-green-600 px-6 py-3 font-medium text-white hover:bg-green-500">浏览全部</Link>
+          <Link href="/publish" className="rounded-md border border-zinc-300 dark:border-zinc-600 px-6 py-3 hover:bg-zinc-100 dark:hover:bg-zinc-800">发布你的第一个 Skill →</Link>
         </div>
 
         {/* 三个统计 */}
         <div className="mt-10 flex gap-10 text-sm font-medium text-zinc-600 dark:text-zinc-400">
-          <a href="/skills" className="hover:text-blue-600 dark:hover:text-blue-400">📦 Skills</a>
-          <a href="/agents" className="hover:text-blue-600 dark:hover:text-blue-400">🤖 Agents</a>
-          <a href="/forum" className="hover:text-blue-600 dark:hover:text-blue-400">💬 论坛</a>
+          <Link href="/skills" className="hover:text-blue-600 dark:hover:text-blue-400">📦 Skills</Link>
+          <Link href="/agents" className="hover:text-blue-600 dark:hover:text-blue-400">🤖 Agents</Link>
+          <Link href="/forum" className="hover:text-blue-600 dark:hover:text-blue-400">💬 论坛</Link>
         </div>
       </section>
 
@@ -67,7 +68,7 @@ export default async function Home() {
         {/* 标题行：左边标题，右边"查看全部" */}
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-xl font-bold">🔥 本周趋势 Skill</h2>
-          <a href="/skills" className="text-sm text-blue-600 dark:text-blue-400 hover:underline">查看全部 →</a>
+          <Link href="/skills" className="text-sm text-blue-600 dark:text-blue-400 hover:underline">查看全部 →</Link>
         </div>
 
         {/* 卡片网格：一行 3 个 */}

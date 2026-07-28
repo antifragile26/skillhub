@@ -39,3 +39,14 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Local Netlify folder
+.netlify
+
+# local dev logs & tooling
+work-dev.*.log
+work-dev.log
+*.tailwindcss-*.log
+tailwindcss-*.log
+.superpowers/
+.mcp.json

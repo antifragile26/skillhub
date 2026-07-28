@@ -1,34 +1,150 @@
-import CreateMenu from "@/components/CreateMenu";
-import ThemeToggle from "@/components/ThemeToggle";
+"use client";
+
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { FormEvent, useState } from "react";
+import PublishPageShell, {
+  inputClassName,
+  labelClassName,
+} from "@/components/PublishPageShell";
+import { buildAgentPayload } from "@/lib/contentPayloads";
+import { supabase } from "@/lib/supabase";
+
+const agentCategories = ["研究分析", "代码开发", "内容创作", "自动化工作流", "其他"];
 
 export default function NewAgentPage() {
+  const router = useRouter();
+  const [name, setName] = useState("");
+  const [framework, setFramework] = useState(agentCategories[0]);
+  const [description, setDescription] = useState("");
+  const [repo, setRepo] = useState("");
+  const [message, setMessage] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  async function publishAgent(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!name.trim() || !description.trim()) {
+      setMessage("请填写 Agent 名称和描述。");
+      return;
+    }
+
+    setIsSubmitting(true);
+    setMessage("");
+
+    const { data } = await supabase.auth.getUser();
+    if (!data.user) {
+      router.push("/login");
+      return;
+    }
+
+    const payload = buildAgentPayload(
+      {
+        name,
+        framework,
+        description: repo.trim() ? `${description.trim()}\n\n入口：${repo.trim()}` : description,
+      },
+      data.user.id,
+    );
+    const { error } = await supabase.from("agents").insert(payload);
+
+    if (error) {
+      setMessage(`发布失败：${error.message}`);
+      setIsSubmitting(false);
+      return;
+    }
+
+    router.push("/agents");
+  }
+
   return (
-    <div className="min-h-screen bg-white dark:bg-[#0a0e14] text-zinc-900 dark:text-zinc-100">
-      <header className="flex items-center gap-6 px-8 py-4 border-b border-zinc-200 dark:border-zinc-800">
-        <a href="/" className="text-2xl font-bold text-blue-500 dark:text-blue-400">SkillHub</a>
-        <input
-          type="text"
-          placeholder="🔍 搜索 Skills、Agents、框架..."
-          className="flex-1 max-w-xl rounded-md bg-zinc-100 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 px-4 py-2 text-sm text-zinc-900 dark:text-zinc-200 placeholder-zinc-500"
-        />
-        <nav className="flex items-center gap-5 text-sm text-zinc-600 dark:text-zinc-300">
-          <a href="/skills" className="hover:text-zinc-900 dark:hover:text-white">Skills</a>
-          <a href="/agents" className="hover:text-zinc-900 dark:hover:text-white">Agents</a>
-          <a href="/forum" className="hover:text-zinc-900 dark:hover:text-white">论坛</a>
-          <CreateMenu />
-          <ThemeToggle />
-          <a href="/login" className="hover:text-zinc-900 dark:hover:text-white">登录</a>
-          <a href="/register" className="rounded-md bg-green-600 px-4 py-1.5 font-medium text-white hover:bg-green-500">注册</a>
-        </nav>
-      </header>
-      <section className="max-w-3xl mx-auto px-8 py-16">
-        <h1 className="text-3xl font-bold mb-4">创建我的 Agent</h1>
-        <p className="text-zinc-500 dark:text-zinc-400 mb-8">注册你的 AI Agent，分享给社区。</p>
-        <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/40 p-8 text-center">
-          <p className="text-zinc-500">🤖 创建表单正在开发中...</p>
-          <a href="/agents" className="mt-4 inline-block text-blue-600 dark:text-blue-400 hover:underline">返回 Agent 目录</a>
+    <PublishPageShell
+      title="发布新 Agent"
+      description="登记你的 Agent，让社区可以了解它的能力、入口和使用方式。"
+    >
+      <form className="space-y-6" onSubmit={publishAgent}>
+        <div className="grid gap-6 md:grid-cols-2">
+          <div>
+            <label className={labelClassName} htmlFor="agent-name">
+              Agent 名称
+            </label>
+            <input
+              id="agent-name"
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              className={inputClassName}
+              placeholder="例如：Research Agent"
+            />
+          </div>
+          <div>
+            <label className={labelClassName} htmlFor="agent-category">
+              类型
+            </label>
+            <select
+              id="agent-category"
+              value={framework}
+              onChange={(event) => setFramework(event.target.value)}
+              className={inputClassName}
+            >
+              {agentCategories.map((category) => (
+                <option key={category}>{category}</option>
+              ))}
+            </select>
+          </div>
         </div>
-      </section>
-    </div>
+
+        <div>
+          <label className={labelClassName} htmlFor="agent-repo">
+            仓库或运行入口
+          </label>
+          <input
+            id="agent-repo"
+            value={repo}
+            onChange={(event) => setRepo(event.target.value)}
+            className={inputClassName}
+            placeholder="https://github.com/yourname/agent 或 https://..."
+          />
+        </div>
+
+        <div>
+          <label className={labelClassName} htmlFor="agent-description">
+            Agent 描述
+          </label>
+          <textarea
+            id="agent-description"
+            value={description}
+            onChange={(event) => setDescription(event.target.value)}
+            className={`${inputClassName} min-h-36 resize-y`}
+            placeholder="它能做什么？适合哪些场景？需要哪些环境变量？"
+          />
+        </div>
+
+        <section className="flex min-h-44 flex-col items-center justify-center rounded-lg border-2 border-dashed border-zinc-300 bg-white px-6 text-center dark:border-zinc-700 dark:bg-[#0f141c]">
+          <div className="text-4xl">🤖</div>
+          <p className="mt-4 text-zinc-600 dark:text-zinc-300">上传 Agent 包，或只填写仓库入口</p>
+          <label className="mt-1 cursor-pointer text-blue-600 hover:underline dark:text-blue-400">
+            选择文件
+            <input type="file" accept=".zip,.tar.gz,.tgz" className="sr-only" />
+          </label>
+        </section>
+
+        {message && <p className="text-sm text-red-600 dark:text-red-400">{message}</p>}
+
+        <div className="flex justify-end gap-4">
+          <Link
+            href="/agents"
+            className="rounded-md border border-zinc-300 px-6 py-3 text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-900"
+          >
+            取消
+          </Link>
+          <button
+            type="submit"
+            disabled={isSubmitting}
+            className="rounded-md bg-green-600 px-8 py-3 font-medium text-white disabled:cursor-wait disabled:opacity-60"
+          >
+            {isSubmitting ? "发布中..." : "发布 Agent"}
+          </button>
+        </div>
+      </form>
+    </PublishPageShell>
   );
 }

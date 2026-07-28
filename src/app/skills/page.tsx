@@ -1,6 +1,8 @@
 import { supabase } from "@/lib/supabase";
 import CreateMenu from "@/components/CreateMenu";
 import ThemeToggle from "@/components/ThemeToggle";
+import AuthControls from "@/components/AuthControls";
+import Link from "next/link";
 
 export default async function SkillsPage() {
   const { data: skills } = await supabase.from("skills").select("*").order("created_at", { ascending: false });
@@ -8,15 +10,14 @@ export default async function SkillsPage() {
   return (
     <div className="min-h-screen bg-white dark:bg-[#0a0e14] text-zinc-900 dark:text-zinc-100">
       <header className="flex items-center gap-6 px-8 py-4 border-b border-zinc-200 dark:border-zinc-800">
-        <a href="/" className="text-2xl font-bold text-blue-500 dark:text-blue-400">SkillHub</a>
+        <Link href="/" className="text-2xl font-bold text-blue-500 dark:text-blue-400">SkillHub</Link>
         <nav className="ml-auto flex items-center gap-5 text-sm text-zinc-600 dark:text-zinc-300">
-          <a href="/skills" className="hover:text-zinc-900 dark:hover:text-white">Skills</a>
-          <a href="/agents" className="hover:text-zinc-900 dark:hover:text-white">Agents</a>
-          <a href="/forum" className="hover:text-zinc-900 dark:hover:text-white">论坛</a>
+          <Link href="/skills" className="hover:text-zinc-900 dark:hover:text-white">Skills</Link>
+          <Link href="/agents" className="hover:text-zinc-900 dark:hover:text-white">Agents</Link>
+          <Link href="/forum" className="hover:text-zinc-900 dark:hover:text-white">论坛</Link>
           <CreateMenu />
           <ThemeToggle />
-          <a href="/login" className="hover:text-zinc-900 dark:hover:text-white">登录</a>
-          <a href="/register" className="rounded-md bg-green-600 px-4 py-1.5 font-medium text-white hover:bg-green-500">注册</a>
+          <AuthControls />
         </nav>
       </header>
       <section className="max-w-6xl mx-auto px-8 py-10">

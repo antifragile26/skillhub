@@ -3,32 +3,23 @@
 import { useState, useEffect } from "react";
 
 export default function ThemeToggle() {
-  // 默认暗色，也可以读取用户之前的选择（localStorage）
-  const [isDark, setIsDark] = useState(true);
+  const [isDark, setIsDark] = useState(() => {
+    if (typeof window === "undefined") return true;
+    return localStorage.getItem("theme") !== "light";
+  });
 
-  // 页面加载时，从浏览器本地存储读取用户之前的偏好
   useEffect(() => {
-    const saved = localStorage.getItem("theme");
-    if (saved === "light") {
-      setIsDark(false);
-      document.documentElement.classList.remove("dark");
-    } else {
-      setIsDark(true);
-      document.documentElement.classList.add("dark");
-    }
-  }, []);
-
-  // 切换主题
-  function toggle() {
     if (isDark) {
-      setIsDark(false);
-      document.documentElement.classList.remove("dark");
-      localStorage.setItem("theme", "light");
-    } else {
-      setIsDark(true);
       document.documentElement.classList.add("dark");
       localStorage.setItem("theme", "dark");
+    } else {
+      document.documentElement.classList.remove("dark");
+      localStorage.setItem("theme", "light");
     }
+  }, [isDark]);
+
+  function toggle() {
+    setIsDark((current) => !current);
   }
 
   return (
