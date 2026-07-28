@@ -1,16 +1,63 @@
-import { notFound } from "next/navigation";
+"use client";
+
+import { notFound, useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import CreateMenu from "@/components/CreateMenu";
 import ThemeToggle from "@/components/ThemeToggle";
 import AuthControls from "@/components/AuthControls";
+import { useEffect, useState } from "react";
 
 // 每次访问都实时从数据库读取
 export const dynamic = "force-dynamic";
 
-export default async function AgentDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
-  const { data: agent } = await supabase.from("agents").select("*").eq("id", id).single();
+type Agent = {
+  id: string | number;
+  name: string;
+  framework?: string | null;
+  description?: string | null;
+  skills_count?: number | null;
+  posts_count?: number | null;
+  created_at?: string | null;
+  user_id?: string | null;
+};
+
+export default function AgentDetailPage() {
+  const params = useParams();
+  const router = useRouter();
+  const id = Array.isArray(params.id) ? params.id[0] : params.id;
+  const [agent, setAgent] = useState<Agent | null>(null);
+  const [user, setUser] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    async function load() {
+      const [agentResult, userResult] = await Promise.all([
+        supabase.from("agents").select("*").eq("id", id).single(),
+        supabase.auth.getUser(),
+      ]);
+      setAgent(agentResult.data);
+      setUser(userResult.data.user);
+      setIsLoading(false);
+    }
+    load();
+  }, [id]);
+
+  async function handleDelete() {
+    if (!agent || !user || agent.user_id !== user.id) return;
+    if (!confirm("确定要删除这个 Agent 吗？删除后无法恢复。")) return;
+
+    const { error } = await supabase.from("agents").delete().eq("id", agent.id);
+    if (error) {
+      alert(`删除失败：${error.message}`);
+      return;
+    }
+    router.push("/agents");
+  }
+
+  if (isLoading) {
+    return <div className="min-h-screen bg-white dark:bg-[#0a0e14] text-zinc-900 dark:text-zinc-100 p-8">加载中...</div>;
+  }
 
   if (!agent) {
     notFound();
@@ -31,7 +78,18 @@ export default async function AgentDetailPage({ params }: { params: Promise<{ id
       </header>
 
       <section className="max-w-5xl mx-auto px-8 py-10">
-        <Link href="/agents" className="text-sm text-zinc-500 hover:text-zinc-900 dark:hover:text-white">← 返回 Agents</Link>
+        <div className="flex items-center justify-between">
+          <Link href="/agents" className="text-sm text-zinc-500 hover:text-zinc-900 dark:hover:text-white">← 返回 Agents</Link>
+          {user && agent.user_id === user.id && (
+            <button
+              type="button"
+              onClick={handleDelete}
+              className="rounded-md border border-red-300 px-3 py-1 text-sm text-red-600 hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-950"
+            >
+              删除
+            </button>
+          )}
+        </div>
 
         {/* 头部：头像 + 名称 + 加入时间 */}
         <div className="mt-6 flex items-start justify-between">
