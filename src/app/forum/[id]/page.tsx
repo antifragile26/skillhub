@@ -119,30 +119,37 @@ export default function PostDetailPage() {
 
     const isRemoving = myVote === "up";
     const isChanging = myVote === "down";
+    const prev = { upvotes, downvotes, myVote };
 
     // 乐观更新 UI
     if (isRemoving) {
-      setUpvotes((prev) => prev - 1);
+      setUpvotes((v) => v - 1);
       setMyVote(null);
     } else if (isChanging) {
-      setUpvotes((prev) => prev + 1);
-      setDownvotes((prev) => prev - 1);
+      setUpvotes((v) => v + 1);
+      setDownvotes((v) => v - 1);
       setMyVote("up");
     } else {
-      setUpvotes((prev) => prev + 1);
+      setUpvotes((v) => v + 1);
       setMyVote("up");
     }
 
-    // 更新数据库
+    // 只操作 votes 表，posts 的计数由数据库触发器自动同步
+    let error;
     if (isRemoving) {
-      await supabase.from("votes").delete().eq("post_id", postId).eq("user_id", user.id);
-      await supabase.from("posts").update({ upvotes: upvotes - 1 }).eq("id", postId);
+      ({ error } = await supabase.from("votes").delete().eq("post_id", postId).eq("user_id", user.id));
     } else if (isChanging) {
-      await supabase.from("votes").update({ vote_type: "up" }).eq("post_id", postId).eq("user_id", user.id);
-      await supabase.from("posts").update({ upvotes: upvotes + 1, downvotes: downvotes - 1 }).eq("id", postId);
+      ({ error } = await supabase.from("votes").update({ vote_type: "up" }).eq("post_id", postId).eq("user_id", user.id));
     } else {
-      await supabase.from("votes").insert({ user_id: user.id, post_id: postId, vote_type: "up" });
-      await supabase.from("posts").update({ upvotes: upvotes + 1 }).eq("id", postId);
+      ({ error } = await supabase.from("votes").insert({ user_id: user.id, post_id: postId, vote_type: "up" }));
+    }
+
+    if (error) {
+      // 失败回滚
+      setUpvotes(prev.upvotes);
+      setDownvotes(prev.downvotes);
+      setMyVote(prev.myVote);
+      setMessage(`操作失败：${error.message}`);
     }
   }
 
@@ -154,30 +161,36 @@ export default function PostDetailPage() {
 
     const isRemoving = myVote === "down";
     const isChanging = myVote === "up";
+    const prev = { upvotes, downvotes, myVote };
 
     // 乐观更新 UI
     if (isRemoving) {
-      setDownvotes((prev) => prev - 1);
+      setDownvotes((v) => v - 1);
       setMyVote(null);
     } else if (isChanging) {
-      setDownvotes((prev) => prev + 1);
-      setUpvotes((prev) => prev - 1);
+      setDownvotes((v) => v + 1);
+      setUpvotes((v) => v - 1);
       setMyVote("down");
     } else {
-      setDownvotes((prev) => prev + 1);
+      setDownvotes((v) => v + 1);
       setMyVote("down");
     }
 
-    // 更新数据库
+    // 只操作 votes 表，posts 的计数由数据库触发器自动同步
+    let error;
     if (isRemoving) {
-      await supabase.from("votes").delete().eq("post_id", postId).eq("user_id", user.id);
-      await supabase.from("posts").update({ downvotes: downvotes - 1 }).eq("id", postId);
+      ({ error } = await supabase.from("votes").delete().eq("post_id", postId).eq("user_id", user.id));
     } else if (isChanging) {
-      await supabase.from("votes").update({ vote_type: "down" }).eq("post_id", postId).eq("user_id", user.id);
-      await supabase.from("posts").update({ downvotes: downvotes + 1, upvotes: upvotes - 1 }).eq("id", postId);
+      ({ error } = await supabase.from("votes").update({ vote_type: "down" }).eq("post_id", postId).eq("user_id", user.id));
     } else {
-      await supabase.from("votes").insert({ user_id: user.id, post_id: postId, vote_type: "down" });
-      await supabase.from("posts").update({ downvotes: downvotes + 1 }).eq("id", postId);
+      ({ error } = await supabase.from("votes").insert({ user_id: user.id, post_id: postId, vote_type: "down" }));
+    }
+
+    if (error) {
+      setUpvotes(prev.upvotes);
+      setDownvotes(prev.downvotes);
+      setMyVote(prev.myVote);
+      setMessage(`操作失败：${error.message}`);
     }
   }
 
