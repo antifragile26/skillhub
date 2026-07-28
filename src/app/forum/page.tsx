@@ -15,6 +15,20 @@ export default async function ForumPage() {
     .select("*")
     .order("created_at", { ascending: false });
 
+  // 读所有评论的 post_id，用来统计每个帖子的真实回复数
+  const { data: comments } = await supabase.from("comments").select("post_id");
+  const replyCounts = new Map<string, number>();
+  for (const { post_id } of comments ?? []) {
+    const key = String(post_id);
+    replyCounts.set(key, (replyCounts.get(key) ?? 0) + 1);
+  }
+
+  // 用真实评论数覆盖 replies 字段
+  const postsWithReplies = (posts ?? []).map((post) => ({
+    ...post,
+    replies: replyCounts.get(String(post.id)) ?? 0,
+  }));
+
   return (
     <div className="min-h-screen bg-white dark:bg-[#0a0e14] text-zinc-900 dark:text-zinc-100">
       <header className="flex items-center gap-6 px-8 py-4 border-b border-zinc-200 dark:border-zinc-800">
@@ -35,7 +49,7 @@ export default async function ForumPage() {
           <Link href="/forum/new" className="rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-500">发帖</Link>
         </div>
 
-        <ForumBrowser posts={posts ?? []} />
+        <ForumBrowser posts={postsWithReplies} />
       </section>
     </div>
   );
