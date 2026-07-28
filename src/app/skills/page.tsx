@@ -4,6 +4,9 @@ import ThemeToggle from "@/components/ThemeToggle";
 import AuthControls from "@/components/AuthControls";
 import Link from "next/link";
 
+// 每次访问都实时从数据库读取，避免缓存导致新内容不显示
+export const dynamic = "force-dynamic";
+
 export default async function SkillsPage() {
   const { data: skills } = await supabase.from("skills").select("*").order("created_at", { ascending: false });
 
