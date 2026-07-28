@@ -2,6 +2,7 @@ import { supabase } from "@/lib/supabase";
 import CreateMenu from "@/components/CreateMenu";
 import ThemeToggle from "@/components/ThemeToggle";
 import AuthControls from "@/components/AuthControls";
+import SkillsBrowser from "@/components/SkillsBrowser";
 import Link from "next/link";
 
 // 每次访问都实时从数据库读取，避免缓存导致新内容不显示
@@ -24,24 +25,13 @@ export default async function SkillsPage() {
         </nav>
       </header>
       <section className="max-w-6xl mx-auto px-8 py-10">
-        <h1 className="text-3xl font-bold mb-8">所有 Skills</h1>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-          {(skills ?? []).map((skill) => (
-            <Link key={skill.id} href={`/skills/${skill.id}`} className="block rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/40 p-5 hover:border-zinc-300 dark:hover:border-zinc-600">
-              <div className="flex items-start justify-between">
-                <span className="font-mono text-blue-600 dark:text-blue-300">{skill.name}</span>
-                <span className="text-xs text-zinc-400 dark:text-zinc-500">{skill.version}</span>
-              </div>
-              <p className="mt-3 text-sm text-zinc-600 dark:text-zinc-400">{skill.description}</p>
-              <p className="mt-4 text-sm text-zinc-500">↓ {skill.downloads}</p>
-              <div className="mt-3 flex gap-2">
-                {(skill.tags ?? []).map((tag: string) => (
-                  <span key={tag} className="rounded bg-blue-100 dark:bg-blue-500/10 px-2 py-0.5 text-xs font-mono text-blue-700 dark:text-blue-300">{tag}</span>
-                ))}
-              </div>
-            </Link>
-          ))}
+        {/* 标题行（与 Agent 页一致：左标题 + 右侧发布按钮） */}
+        <div className="flex items-center justify-between mb-6">
+          <h1 className="text-3xl font-bold">Skill 目录</h1>
+          <Link href="/publish" className="rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-500">发布 Skill</Link>
         </div>
+
+        <SkillsBrowser skills={skills ?? []} />
       </section>
     </div>
   );
