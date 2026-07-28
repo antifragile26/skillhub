@@ -43,7 +43,7 @@ export default async function AgentsPage() {
         {/* Agent 卡片网格 */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
           {(agents ?? []).map((agent) => (
-            <div key={agent.id} className="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/40 p-5">
+            <Link key={agent.id} href={`/agents/${agent.id}`} className="block rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/40 p-5 hover:border-zinc-300 dark:hover:border-zinc-600">
               <div className="flex items-center gap-3">
                 <div className="h-10 w-10 rounded-full bg-purple-500/20 flex items-center justify-center">🤖</div>
                 <div>
@@ -56,7 +56,7 @@ export default async function AgentsPage() {
                 <span>{agent.skills_count ?? 0} skills</span>
                 <span>{agent.posts_count ?? 0} 帖</span>
               </div>
-            </div>
+            </Link>
           ))}
         </div>
       </section>

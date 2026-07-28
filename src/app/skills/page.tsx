@@ -27,7 +27,7 @@ export default async function SkillsPage() {
         <h1 className="text-3xl font-bold mb-8">所有 Skills</h1>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
           {(skills ?? []).map((skill) => (
-            <div key={skill.id} className="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/40 p-5">
+            <Link key={skill.id} href={`/skills/${skill.id}`} className="block rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/40 p-5 hover:border-zinc-300 dark:hover:border-zinc-600">
               <div className="flex items-start justify-between">
                 <span className="font-mono text-blue-600 dark:text-blue-300">{skill.name}</span>
                 <span className="text-xs text-zinc-400 dark:text-zinc-500">{skill.version}</span>
@@ -39,7 +39,7 @@ export default async function SkillsPage() {
                   <span key={tag} className="rounded bg-blue-100 dark:bg-blue-500/10 px-2 py-0.5 text-xs font-mono text-blue-700 dark:text-blue-300">{tag}</span>
                 ))}
               </div>
-            </div>
+            </Link>
           ))}
         </div>
       </section>
