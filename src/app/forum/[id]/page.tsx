@@ -50,6 +50,7 @@ export default function PostDetailPage() {
   const [post, setPost] = useState<Post | null>(null);
   const [upvotes, setUpvotes] = useState(0);
   const [downvotes, setDownvotes] = useState(0);
+  const [myVote, setMyVote] = useState<"up" | "down" | null>(null);
   const [replyText, setReplyText] = useState("");
   const [comments, setComments] = useState<Comment[]>([]);
   const [user, setUser] = useState<CurrentUser | null>(null);
@@ -71,13 +72,21 @@ export default function PostDetailPage() {
       if (!postId) return;
 
       setIsLoading(true);
-      const [postResult, commentsResult] = await Promise.all([
+      const [postResult, commentsResult, voteResult] = await Promise.all([
         supabase.from("posts").select("*").eq("id", postId).single(),
         supabase
           .from("comments")
           .select("id, post_id, user_id, content, created_at")
           .eq("post_id", postId)
           .order("created_at", { ascending: true }),
+        user
+          ? supabase
+              .from("votes")
+              .select("vote_type")
+              .eq("post_id", postId)
+              .eq("user_id", user.id)
+              .maybeSingle()
+          : Promise.resolve({ data: null, error: null }),
       ]);
 
       if (postResult.data) {
@@ -92,24 +101,84 @@ export default function PostDetailPage() {
         setComments((commentsResult.data ?? []) as Comment[]);
       }
 
+      if (voteResult.data) {
+        setMyVote(voteResult.data.vote_type as "up" | "down");
+      }
+
       setIsLoading(false);
     }
 
     void loadPostAndComments();
-  }, [postId]);
+  }, [postId, user]);
 
   async function handleUpvote() {
-    if (!postId) return;
-    const newUpvotes = upvotes + 1;
-    setUpvotes(newUpvotes);
-    await supabase.from("posts").update({ upvotes: newUpvotes }).eq("id", postId);
+    if (!postId || !user) {
+      router.push("/login");
+      return;
+    }
+
+    const isRemoving = myVote === "up";
+    const isChanging = myVote === "down";
+
+    // 乐观更新 UI
+    if (isRemoving) {
+      setUpvotes((prev) => prev - 1);
+      setMyVote(null);
+    } else if (isChanging) {
+      setUpvotes((prev) => prev + 1);
+      setDownvotes((prev) => prev - 1);
+      setMyVote("up");
+    } else {
+      setUpvotes((prev) => prev + 1);
+      setMyVote("up");
+    }
+
+    // 更新数据库
+    if (isRemoving) {
+      await supabase.from("votes").delete().eq("post_id", postId).eq("user_id", user.id);
+      await supabase.from("posts").update({ upvotes: upvotes - 1 }).eq("id", postId);
+    } else if (isChanging) {
+      await supabase.from("votes").update({ vote_type: "up" }).eq("post_id", postId).eq("user_id", user.id);
+      await supabase.from("posts").update({ upvotes: upvotes + 1, downvotes: downvotes - 1 }).eq("id", postId);
+    } else {
+      await supabase.from("votes").insert({ user_id: user.id, post_id: postId, vote_type: "up" });
+      await supabase.from("posts").update({ upvotes: upvotes + 1 }).eq("id", postId);
+    }
   }
 
   async function handleDownvote() {
-    if (!postId) return;
-    const newDownvotes = downvotes + 1;
-    setDownvotes(newDownvotes);
-    await supabase.from("posts").update({ downvotes: newDownvotes }).eq("id", postId);
+    if (!postId || !user) {
+      router.push("/login");
+      return;
+    }
+
+    const isRemoving = myVote === "down";
+    const isChanging = myVote === "up";
+
+    // 乐观更新 UI
+    if (isRemoving) {
+      setDownvotes((prev) => prev - 1);
+      setMyVote(null);
+    } else if (isChanging) {
+      setDownvotes((prev) => prev + 1);
+      setUpvotes((prev) => prev - 1);
+      setMyVote("down");
+    } else {
+      setDownvotes((prev) => prev + 1);
+      setMyVote("down");
+    }
+
+    // 更新数据库
+    if (isRemoving) {
+      await supabase.from("votes").delete().eq("post_id", postId).eq("user_id", user.id);
+      await supabase.from("posts").update({ downvotes: downvotes - 1 }).eq("id", postId);
+    } else if (isChanging) {
+      await supabase.from("votes").update({ vote_type: "down" }).eq("post_id", postId).eq("user_id", user.id);
+      await supabase.from("posts").update({ downvotes: downvotes + 1, upvotes: upvotes - 1 }).eq("id", postId);
+    } else {
+      await supabase.from("votes").insert({ user_id: user.id, post_id: postId, vote_type: "down" });
+      await supabase.from("posts").update({ downvotes: downvotes + 1 }).eq("id", postId);
+    }
   }
 
   async function handleReply() {
@@ -220,10 +289,18 @@ export default function PostDetailPage() {
           </p>
 
           <div className="flex items-center gap-6 border-t border-zinc-200 pt-4 text-sm dark:border-zinc-700">
-            <button type="button" onClick={handleUpvote} className="flex items-center gap-1 hover:text-green-600">
+            <button
+              type="button"
+              onClick={handleUpvote}
+              className={`flex items-center gap-1 ${myVote === "up" ? "text-green-600 font-semibold" : "hover:text-green-600"}`}
+            >
               👍 <span>{upvotes}</span>
             </button>
-            <button type="button" onClick={handleDownvote} className="flex items-center gap-1 hover:text-red-600">
+            <button
+              type="button"
+              onClick={handleDownvote}
+              className={`flex items-center gap-1 ${myVote === "down" ? "text-red-600 font-semibold" : "hover:text-red-600"}`}
+            >
               👎 <span>{downvotes}</span>
             </button>
             <span className="flex items-center gap-1 text-zinc-500">
