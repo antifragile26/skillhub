@@ -19,6 +19,7 @@ type Post = {
   created_at?: string | null;
   upvotes?: number | null;
   downvotes?: number | null;
+  user_id?: string | null;
 };
 
 type Comment = {
@@ -139,6 +140,24 @@ export default function PostDetailPage() {
     setIsSubmitting(false);
   }
 
+  async function handleDeletePost() {
+    if (!postId || !user || !post) return;
+    if (post.user_id !== user.id) {
+      setMessage("只能删除自己的帖子。");
+      return;
+    }
+
+    if (!confirm("确定要删除这个帖子吗？删除后无法恢复。")) return;
+
+    const { error } = await supabase.from("posts").delete().eq("id", postId);
+    if (error) {
+      setMessage(`删除失败：${error.message}`);
+      return;
+    }
+
+    router.push("/forum");
+  }
+
   if (isLoading || !post) {
     return <div className="min-h-screen bg-white p-8 text-zinc-900 dark:bg-[#0a0e14] dark:text-zinc-100">加载中...</div>;
   }
@@ -172,7 +191,18 @@ export default function PostDetailPage() {
             <span className="rounded-md bg-zinc-700 px-3 py-1 text-xs text-zinc-100">{post.category || "综合讨论"}</span>
           </div>
 
-          <h1 className="mb-4 text-2xl font-bold">{post.title}</h1>
+          <div className="mb-4 flex items-start justify-between">
+            <h1 className="text-2xl font-bold">{post.title}</h1>
+            {user && post.user_id === user.id && (
+              <button
+                type="button"
+                onClick={handleDeletePost}
+                className="rounded-md border border-red-300 px-3 py-1 text-sm text-red-600 hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-950"
+              >
+                删除
+              </button>
+            )}
+          </div>
 
           <div className="mb-6 flex items-center gap-2 text-sm">
             <span className="rounded-md bg-blue-600 px-2 py-1 text-xs font-medium text-white">作者</span>
