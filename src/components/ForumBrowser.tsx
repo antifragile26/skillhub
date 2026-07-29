@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
+import { postCategories, categoryLabel } from "@/lib/forumCategories";
 
 type Post = {
   id: string | number;
@@ -13,16 +14,6 @@ type Post = {
   downvotes?: number | null;
   created_at?: string | null;
 };
-
-const categories = [
-  "question",
-  "bug_report",
-  "showcase",
-  "general",
-  "skill_exchange",
-  "security_audit",
-  "review",
-];
 
 export default function ForumBrowser({ posts }: { posts: Post[] }) {
   const [sort, setSort] = useState<"latest" | "hot">("latest");
@@ -68,18 +59,18 @@ export default function ForumBrowser({ posts }: { posts: Post[] }) {
         </div>
 
         <div className="ml-auto flex flex-wrap gap-2 text-sm">
-          {categories.map((c) => (
+          {postCategories.map((c) => (
             <button
-              key={c}
+              key={c.value}
               type="button"
-              onClick={() => setCategory(category === c ? null : c)}
+              onClick={() => setCategory(category === c.value ? null : c.value)}
               className={`rounded-md px-3 py-1.5 ${
-                category === c
+                category === c.value
                   ? "bg-zinc-700 text-white"
                   : "border border-zinc-300 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:border-zinc-400 dark:hover:border-zinc-500"
               }`}
             >
-              {c}
+              {c.label}
             </button>
           ))}
         </div>
@@ -106,7 +97,7 @@ export default function ForumBrowser({ posts }: { posts: Post[] }) {
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
                   {post.category && (
-                    <span className="rounded border border-zinc-300 dark:border-zinc-700 px-1.5 py-0.5 text-[11px] text-zinc-500">{post.category}</span>
+                    <span className="rounded border border-zinc-300 dark:border-zinc-700 px-1.5 py-0.5 text-[11px] text-zinc-500">{categoryLabel(post.category)}</span>
                   )}
                   <span className="font-medium hover:text-blue-600 dark:hover:text-blue-400">{post.title}</span>
                 </div>

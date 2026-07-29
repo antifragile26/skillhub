@@ -8,6 +8,7 @@ import CreateMenu from "@/components/CreateMenu";
 import ThemeToggle from "@/components/ThemeToggle";
 import { buildCommentPayload } from "@/lib/contentPayloads";
 import { getProfileDisplay } from "@/lib/profile";
+import { categoryLabel } from "@/lib/forumCategories";
 import { supabase } from "@/lib/supabase";
 
 type Post = {
@@ -270,7 +271,7 @@ export default function PostDetailPage() {
 
         <article className="rounded-lg border border-zinc-200 bg-zinc-50 p-6 dark:border-zinc-800 dark:bg-zinc-900/40">
           <div className="mb-4">
-            <span className="rounded-md bg-zinc-700 px-3 py-1 text-xs text-zinc-100">{post.category || "综合讨论"}</span>
+            <span className="rounded-md bg-zinc-700 px-3 py-1 text-xs text-zinc-100">{categoryLabel(post.category) || "综合讨论"}</span>
           </div>
 
           <div className="mb-4 flex items-start justify-between">

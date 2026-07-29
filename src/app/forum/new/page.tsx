@@ -5,18 +5,8 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import PublishPageShell, { inputClassName, labelClassName } from "@/components/PublishPageShell";
 import { getProfileDisplay } from "@/lib/profile";
+import { postCategories } from "@/lib/forumCategories";
 import { supabase } from "@/lib/supabase";
-
-const postCategories = [
-  { value: "question", label: "提问" },
-  { value: "bug_report", label: "Bug 反馈" },
-  { value: "showcase", label: "作品展示" },
-  { value: "general", label: "综合讨论" },
-  { value: "skill_exchange", label: "Skill 交流" },
-  { value: "security_audit", label: "安全审计" },
-  { value: "review", label: "评审" },
-  { value: "other", label: "其他" },
-];
 
 export default function NewPostPage() {
   const router = useRouter();
