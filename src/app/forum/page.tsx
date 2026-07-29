@@ -5,8 +5,8 @@ import AuthControls from "@/components/AuthControls";
 import ForumBrowser from "@/components/ForumBrowser";
 import Link from "next/link";
 
-// 每次访问都实时从数据库读取，避免缓存导致新帖不显示
-export const dynamic = "force-dynamic";
+// 每 15 秒重新从数据库读一次（而不是每次访问都读），兼顾新帖可见性和速度
+export const revalidate = 15;
 
 export default async function ForumPage() {
   // 去数据库读所有帖子，按时间从新到旧
@@ -15,19 +15,16 @@ export default async function ForumPage() {
     .select("*")
     .order("created_at", { ascending: false });
 
-  // 读所有评论的 post_id，用来统计每个帖子的真实回复数
-  const { data: comments } = await supabase.from("comments").select("post_id");
-  const replyCounts = new Map<string, number>();
-  for (const { post_id } of comments ?? []) {
-    const key = String(post_id);
-    replyCounts.set(key, (replyCounts.get(key) ?? 0) + 1);
-  }
-
-  // 用真实评论数覆盖 replies 字段
-  const postsWithReplies = (posts ?? []).map((post) => ({
-    ...post,
-    replies: replyCounts.get(String(post.id)) ?? 0,
-  }));
+  // 统计每个帖子的真实回复数：对每个帖子分别用 count，不用把整张评论表读回来
+  const postsWithReplies = await Promise.all(
+    (posts ?? []).map(async (post) => {
+      const { count } = await supabase
+        .from("comments")
+        .select("id", { count: "exact", head: true })
+        .eq("post_id", post.id);
+      return { ...post, replies: count ?? 0 };
+    }),
+  );
 
   return (
     <div className="min-h-screen bg-white dark:bg-[#0a0e14] text-zinc-900 dark:text-zinc-100">

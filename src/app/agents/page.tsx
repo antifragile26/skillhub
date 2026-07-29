@@ -5,12 +5,12 @@ import AuthControls from "@/components/AuthControls";
 import AgentsBrowser from "@/components/AgentsBrowser";
 import Link from "next/link";
 
-// 每次访问都实时从数据库读取，避免缓存导致新内容不显示
-export const dynamic = "force-dynamic";
+// 每 15 秒重新从数据库读一次（而不是每次访问都读），兼顾新内容可见性和速度
+export const revalidate = 15;
 
 export default async function AgentsPage() {
   // 去数据库读所有 agent
-  const { data: agents } = await supabase.from("agents").select("*");
+  const { data: agents } = await supabase.from("agents").select("*").limit(60);
 
   return (
     <div className="min-h-screen bg-white dark:bg-[#0a0e14] text-zinc-900 dark:text-zinc-100">

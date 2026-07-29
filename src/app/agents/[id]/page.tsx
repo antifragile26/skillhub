@@ -8,9 +8,6 @@ import ThemeToggle from "@/components/ThemeToggle";
 import AuthControls from "@/components/AuthControls";
 import { useEffect, useState } from "react";
 
-// 每次访问都实时从数据库读取
-export const dynamic = "force-dynamic";
-
 type Agent = {
   id: string | number;
   name: string;

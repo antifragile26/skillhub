@@ -25,24 +25,24 @@ export default function CreateMenu() {
         <>
           <div className="fixed inset-0 z-10" onClick={() => setIsOpen(false)} />
 
-          <div className="absolute right-0 z-20 mt-2 w-72 rounded-xl border border-zinc-300 bg-white py-3 shadow-2xl dark:border-zinc-700 dark:bg-[#18181b]">
+          <div className="absolute right-0 z-20 mt-2 w-56 rounded-xl border border-zinc-300 bg-white py-2 shadow-2xl dark:border-zinc-700 dark:bg-[#18181b]">
             <Link
               href="/publish"
-              className="flex items-center gap-5 px-8 py-4 text-2xl font-semibold text-zinc-700 hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-800"
+              className="flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-zinc-700 hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-800"
             >
               <span>📦</span>
               <span>发布 Skill</span>
             </Link>
             <Link
               href="/agents/new"
-              className="flex items-center gap-5 px-8 py-4 text-2xl font-semibold text-zinc-700 hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-800"
+              className="flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-zinc-700 hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-800"
             >
               <span>🤖</span>
               <span>发布 Agent</span>
             </Link>
             <Link
               href="/forum/new"
-              className="flex items-center gap-5 px-8 py-4 text-2xl font-semibold text-zinc-700 hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-800"
+              className="flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-zinc-700 hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-800"
             >
               <span>✍️</span>
               <span>发帖</span>

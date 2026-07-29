@@ -13,8 +13,6 @@ type Skill = {
   created_at?: string | null;
 };
 
-const frameworks = ["claude-code", "langchain", "crewai", "autogen"];
-
 type SortKey = "downloads" | "latest";
 const sortLabels: Record<SortKey, string> = {
   downloads: "下载量",
@@ -23,12 +21,21 @@ const sortLabels: Record<SortKey, string> = {
 
 export default function SkillsBrowser({ skills }: { skills: Skill[] }) {
   const [query, setQuery] = useState("");
-  const [selectedFrameworks, setSelectedFrameworks] = useState<string[]>([]);
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [sort, setSort] = useState<SortKey>("downloads");
 
-  function toggleFramework(fw: string) {
-    setSelectedFrameworks((current) =>
-      current.includes(fw) ? current.filter((f) => f !== fw) : [...current, fw],
+  // 从所有 Skill 的 tags 里动态汇总出可选标签（去重、排序）
+  const allTags = useMemo(() => {
+    const set = new Set<string>();
+    for (const skill of skills) {
+      for (const tag of skill.tags ?? []) set.add(tag);
+    }
+    return Array.from(set).sort();
+  }, [skills]);
+
+  function toggleTag(tag: string) {
+    setSelectedTags((current) =>
+      current.includes(tag) ? current.filter((t) => t !== tag) : [...current, tag],
     );
   }
 
@@ -40,11 +47,11 @@ export default function SkillsBrowser({ skills }: { skills: Skill[] }) {
         !q ||
         skill.name.toLowerCase().includes(q) ||
         (skill.description ?? "").toLowerCase().includes(q);
-      // 框架：勾选的取并集，tags 命中任一即可
-      const matchesFramework =
-        selectedFrameworks.length === 0 ||
-        (skill.tags ?? []).some((tag) => selectedFrameworks.includes(tag));
-      return matchesQuery && matchesFramework;
+      // 标签：勾选的取并集，tags 命中任一即可
+      const matchesTag =
+        selectedTags.length === 0 ||
+        (skill.tags ?? []).some((tag) => selectedTags.includes(tag));
+      return matchesQuery && matchesTag;
     });
 
     if (sort === "downloads") {
@@ -56,26 +63,30 @@ export default function SkillsBrowser({ skills }: { skills: Skill[] }) {
       );
     }
     return list;
-  }, [skills, query, selectedFrameworks, sort]);
+  }, [skills, query, selectedTags, sort]);
 
   return (
     <div className="grid gap-8 lg:grid-cols-[200px_1fr]">
       {/* 左侧筛选栏 */}
       <aside>
-        <p className="mb-4 text-sm font-semibold">框架</p>
-        <div className="space-y-3">
-          {frameworks.map((fw) => (
-            <label key={fw} className="flex cursor-pointer items-center gap-2 text-sm text-zinc-600 dark:text-zinc-300">
-              <input
-                type="checkbox"
-                checked={selectedFrameworks.includes(fw)}
-                onChange={() => toggleFramework(fw)}
-                className="h-4 w-4 rounded border-zinc-400 dark:border-zinc-600"
-              />
-              <span className="font-mono">{fw}</span>
-            </label>
-          ))}
-        </div>
+        <p className="mb-4 text-sm font-semibold">标签</p>
+        {allTags.length === 0 ? (
+          <p className="text-sm text-zinc-500">暂无标签</p>
+        ) : (
+          <div className="space-y-3">
+            {allTags.map((tag) => (
+              <label key={tag} className="flex cursor-pointer items-center gap-2 text-sm text-zinc-600 dark:text-zinc-300">
+                <input
+                  type="checkbox"
+                  checked={selectedTags.includes(tag)}
+                  onChange={() => toggleTag(tag)}
+                  className="h-4 w-4 rounded border-zinc-400 dark:border-zinc-600"
+                />
+                <span className="font-mono">{tag}</span>
+              </label>
+            ))}
+          </div>
+        )}
       </aside>
 
       {/* 右侧：搜索 + 排序 + 列表 */}
