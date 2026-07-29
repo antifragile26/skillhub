@@ -7,6 +7,7 @@ import { postCategories, categoryLabel } from "@/lib/forumCategories";
 type Post = {
   id: string | number;
   title: string;
+  content?: string | null;
   category?: string | null;
   author?: string | null;
   replies?: number | null;
@@ -18,9 +19,18 @@ type Post = {
 export default function ForumBrowser({ posts }: { posts: Post[] }) {
   const [sort, setSort] = useState<"latest" | "hot">("latest");
   const [category, setCategory] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
 
   const visiblePosts = useMemo(() => {
-    let list = category ? posts.filter((p) => p.category === category) : [...posts];
+    const q = query.trim().toLowerCase();
+    let list = posts.filter((p) => {
+      const matchesCategory = !category || p.category === category;
+      const matchesQuery =
+        !q ||
+        p.title.toLowerCase().includes(q) ||
+        (p.content ?? "").toLowerCase().includes(q);
+      return matchesCategory && matchesQuery;
+    });
     if (sort === "hot") {
       // 最热：按点赞数排序，其次回复数
       list.sort(
@@ -35,10 +45,19 @@ export default function ForumBrowser({ posts }: { posts: Post[] }) {
       );
     }
     return list;
-  }, [posts, sort, category]);
+  }, [posts, sort, category, query]);
 
   return (
     <>
+      {/* 搜索框 */}
+      <input
+        type="text"
+        value={query}
+        onChange={(event) => setQuery(event.target.value)}
+        placeholder="🔍 搜索帖子..."
+        className="mb-6 w-full rounded-md border border-zinc-300 bg-white px-4 py-2.5 text-sm text-zinc-900 placeholder-zinc-500 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-200"
+      />
+
       {/* 排序切换 + 分类筛选 */}
       <div className="mb-6 flex flex-wrap items-center gap-4">
         <div className="flex gap-1 text-sm">
@@ -79,7 +98,7 @@ export default function ForumBrowser({ posts }: { posts: Post[] }) {
       {/* 帖子列表 */}
       <div className="space-y-3">
         {visiblePosts.length === 0 ? (
-          <p className="py-10 text-center text-sm text-zinc-500">这个分类下还没有帖子。</p>
+          <p className="py-10 text-center text-sm text-zinc-500">没有匹配的帖子。</p>
         ) : (
           visiblePosts.map((post) => (
             <Link
