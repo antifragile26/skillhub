@@ -74,7 +74,7 @@ export default async function Home() {
         {/* 卡片网格：一行 3 个 */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
           {(trendingSkills ?? []).map((skill) => (
-            <div key={skill.name} className="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/40 p-5 hover:border-zinc-300 dark:hover:border-zinc-600">
+            <Link key={skill.id} href={`/skills/${skill.id}`} className="block rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/40 p-5 hover:border-zinc-300 dark:hover:border-zinc-600">
               {/* 名字 + 版本 */}
               <div className="flex items-start justify-between">
                 <span className="font-mono text-blue-600 dark:text-blue-300">{skill.name}</span>
@@ -90,7 +90,7 @@ export default async function Home() {
                   <span key={tag} className="rounded bg-blue-100 dark:bg-blue-500/10 px-2 py-0.5 text-xs font-mono text-blue-700 dark:text-blue-300">{tag}</span>
                 ))}
               </div>
-            </div>
+            </Link>
           ))}
         </div>
       </section>
