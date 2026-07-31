@@ -128,51 +128,52 @@ export default function AgentsBrowser({ agents }: { agents: Agent[] }) {
 
         {/* 右侧：Agent 卡片网格 */}
         <div>
-        {visibleAgents.length === 0 ? (
-          <p className="py-10 text-center text-sm text-zinc-500">没有匹配的 agent。</p>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-            {visibleAgents.map((agent) => {
-              const agentFws = agent.frameworks || (agent.framework ? [agent.framework] : []);
-              return (
-                <Link
-                  key={agent.id}
-                  href={`/agents/${agent.id}`}
-                  className="block rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/40 p-5 hover:border-zinc-300 dark:hover:border-zinc-600"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 rounded-full bg-purple-500/20 flex items-center justify-center">🤖</div>
-                    <div className="min-w-0 flex-1">
-                      <div className="font-semibold truncate">{agent.name}</div>
-                      <div className="text-xs text-zinc-500">
-                        {agentCategoryLabel(agent.category)}
+          {visibleAgents.length === 0 ? (
+            <p className="py-10 text-center text-sm text-zinc-500">没有匹配的 agent。</p>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+              {visibleAgents.map((agent) => {
+                const agentFws = agent.frameworks || (agent.framework ? [agent.framework] : []);
+                return (
+                  <Link
+                    key={agent.id}
+                    href={`/agents/${agent.id}`}
+                    className="block rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/40 p-5 hover:border-zinc-300 dark:hover:border-zinc-600"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="h-10 w-10 rounded-full bg-purple-500/20 flex items-center justify-center">🤖</div>
+                      <div className="min-w-0 flex-1">
+                        <div className="font-semibold truncate">{agent.name}</div>
+                        <div className="text-xs text-zinc-500">
+                          {agentCategoryLabel(agent.category)}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                  <p className="mt-4 text-sm text-zinc-600 dark:text-zinc-400 line-clamp-2">
-                    {agent.description}
-                  </p>
-                  {agentFws.length > 0 && (
-                    <div className="mt-3 flex flex-wrap gap-1">
-                      {agentFws.map((fw) => (
-                        <span
-                          key={fw}
-                          className="rounded bg-purple-100 dark:bg-purple-500/10 px-2 py-0.5 text-xs font-mono text-purple-700 dark:text-purple-300"
-                        >
-                          {fw}
-                        </span>
-                      ))}
+                    <p className="mt-4 text-sm text-zinc-600 dark:text-zinc-400 line-clamp-2">
+                      {agent.description}
+                    </p>
+                    {agentFws.length > 0 && (
+                      <div className="mt-3 flex flex-wrap gap-1">
+                        {agentFws.map((fw) => (
+                          <span
+                            key={fw}
+                            className="rounded bg-purple-100 dark:bg-purple-500/10 px-2 py-0.5 text-xs font-mono text-purple-700 dark:text-purple-300"
+                          >
+                            {fw}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    <div className="mt-4 flex gap-4 text-xs text-zinc-500">
+                      <span>{agent.skills_count ?? 0} skills</span>
+                      <span>{agent.posts_count ?? 0} 帖</span>
                     </div>
-                  )}
-                  <div className="mt-4 flex gap-4 text-xs text-zinc-500">
-                    <span>{agent.skills_count ?? 0} skills</span>
-                    <span>{agent.posts_count ?? 0} 帖</span>
-                  </div>
-                </Link>
-              );
-            })}
-          </div>
-        )}
+                  </Link>
+                );
+              })}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
