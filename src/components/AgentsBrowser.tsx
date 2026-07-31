@@ -63,38 +63,49 @@ export default function AgentsBrowser({ agents }: { agents: Agent[] }) {
   }, [agents, selectedCategory, selectedFrameworks, query]);
 
   return (
-    <div className="grid gap-8 lg:grid-cols-[200px_1fr]">
-      {/* 左侧筛选栏 */}
-      <aside>
-        {/* 类别筛选 */}
-        <div className="mb-6">
-          <p className="mb-3 text-sm font-semibold">类别</p>
-          <div className="space-y-2">
-            <label className="flex cursor-pointer items-center gap-2 text-sm">
-              <input
-                type="radio"
-                checked={selectedCategory === null}
-                onChange={() => setSelectedCategory(null)}
-                className="h-4 w-4"
-              />
-              <span>全部</span>
-            </label>
-            {agentCategories.map((cat) => (
-              <label key={cat.value} className="flex cursor-pointer items-center gap-2 text-sm text-zinc-600 dark:text-zinc-300">
-                <input
-                  type="radio"
-                  checked={selectedCategory === cat.value}
-                  onChange={() => setSelectedCategory(cat.value)}
-                  className="h-4 w-4"
-                />
-                <span>{cat.label}</span>
-              </label>
-            ))}
-          </div>
-        </div>
+    <div className="space-y-6">
+      {/* 顶部：搜索框 */}
+      <input
+        type="text"
+        value={query}
+        onChange={(event) => setQuery(event.target.value)}
+        placeholder="🔍 搜索 agent..."
+        className="w-full rounded-md border border-zinc-300 bg-white px-4 py-2.5 text-sm text-zinc-900 placeholder-zinc-500 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-200"
+      />
 
-        {/* 框架筛选 */}
-        <div>
+      {/* 类别筛选（横向标签按钮） */}
+      <div className="flex flex-wrap gap-2 text-sm">
+        <button
+          type="button"
+          onClick={() => setSelectedCategory(null)}
+          className={`rounded-md px-3 py-1.5 ${
+            selectedCategory === null
+              ? "bg-zinc-700 text-white"
+              : "border border-zinc-300 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:border-zinc-400 dark:hover:border-zinc-500"
+          }`}
+        >
+          全部
+        </button>
+        {agentCategories.map((cat) => (
+          <button
+            key={cat.value}
+            type="button"
+            onClick={() => setSelectedCategory(selectedCategory === cat.value ? null : cat.value)}
+            className={`rounded-md px-3 py-1.5 ${
+              selectedCategory === cat.value
+                ? "bg-zinc-700 text-white"
+                : "border border-zinc-300 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:border-zinc-400 dark:hover:border-zinc-500"
+            }`}
+          >
+            {cat.label}
+          </button>
+        ))}
+      </div>
+
+      {/* 主体：左右布局 - 框架筛选 + Agent 卡片 */}
+      <div className="grid gap-8 lg:grid-cols-[200px_1fr]">
+        {/* 左侧：框架筛选 */}
+        <aside>
           <p className="mb-3 text-sm font-semibold">框架</p>
           {availableFrameworks.length === 0 ? (
             <p className="text-sm text-zinc-500">暂无框架</p>
@@ -113,11 +124,10 @@ export default function AgentsBrowser({ agents }: { agents: Agent[] }) {
               ))}
             </div>
           )}
-        </div>
-      </aside>
+        </aside>
 
-      {/* 右侧：搜索 + Agent 卡片 */}
-      <div>
+        {/* 右侧：Agent 卡片 */}
+        <div>
         {/* 搜索框 */}
         <input
           type="text"
