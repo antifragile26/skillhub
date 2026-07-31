@@ -15,11 +15,19 @@ export default function NewAgentPage() {
   const router = useRouter();
   const [name, setName] = useState("");
   const [category, setCategory] = useState(agentCategories[0].value);
-  const [frameworks, setFrameworks] = useState("");
+  const [selectedFrameworks, setSelectedFrameworks] = useState<string[]>([]);
   const [description, setDescription] = useState("");
   const [repo, setRepo] = useState("");
   const [message, setMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  function toggleFramework(framework: string) {
+    setSelectedFrameworks((current) =>
+      current.includes(framework)
+        ? current.filter((f) => f !== framework)
+        : [...current, framework],
+    );
+  }
 
   async function publishAgent(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -41,7 +49,7 @@ export default function NewAgentPage() {
       {
         name,
         category,
-        frameworks,
+        frameworks: selectedFrameworks.join(" "),
         description: repo.trim() ? `${description.trim()}\n\n入口：${repo.trim()}` : description,
       },
       data.user.id,
@@ -97,16 +105,22 @@ export default function NewAgentPage() {
           <label className={labelClassName} htmlFor="agent-frameworks">
             支持的框架
           </label>
-          <input
-            id="agent-frameworks"
-            value={frameworks}
-            onChange={(event) => setFrameworks(event.target.value)}
-            className={inputClassName}
-            placeholder="用空格或逗号分隔，例如：LangGraph CrewAI AutoGen"
-          />
-          <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-            可选：{agentFrameworks.join("、")}
-          </p>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+            {agentFrameworks.map((fw) => (
+              <label
+                key={fw}
+                className="flex cursor-pointer items-center gap-2 rounded-md border border-zinc-300 bg-white px-3 py-2.5 text-sm hover:border-zinc-400 dark:border-zinc-700 dark:bg-zinc-950 dark:hover:border-zinc-600"
+              >
+                <input
+                  type="checkbox"
+                  checked={selectedFrameworks.includes(fw)}
+                  onChange={() => toggleFramework(fw)}
+                  className="h-4 w-4 rounded border-zinc-400 dark:border-zinc-600"
+                />
+                <span>{fw}</span>
+              </label>
+            ))}
+          </div>
         </div>
 
         <div>
