@@ -1,6 +1,7 @@
 type AgentFormValues = {
   name: string;
-  framework: string;
+  category: string;
+  frameworks: string;
   description: string;
 };
 
@@ -14,7 +15,11 @@ type SkillFormValues = {
 export function buildAgentPayload(values: AgentFormValues, userId: string) {
   return {
     name: values.name.trim(),
-    framework: values.framework.trim(),
+    category: values.category.trim(),
+    frameworks: values.frameworks
+      .split(/[\s,，]+/)
+      .map((f) => f.trim())
+      .filter(Boolean),
     description: values.description.trim(),
     user_id: userId,
   };

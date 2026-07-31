@@ -2,97 +2,178 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
+import { agentCategories, agentCategoryLabel, agentFrameworks } from "@/lib/agentConstants";
 
 type Agent = {
   id: string | number;
   name: string;
-  framework?: string | null;
+  category?: string | null;
+  framework?: string | null; // 旧数据兼容
+  frameworks?: string[] | null; // 新数据
   description?: string | null;
   skills_count?: number | null;
   posts_count?: number | null;
 };
 
 export default function AgentsBrowser({ agents }: { agents: Agent[] }) {
-  const [selected, setSelected] = useState("全部");
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [selectedFrameworks, setSelectedFrameworks] = useState<string[]>([]);
   const [query, setQuery] = useState("");
 
-  // 从所有 agent 的 framework 汇总去重，"全部" 排最前
-  const filters = useMemo(() => {
+  // 从所有 agent 的 frameworks 汇总去重（兼容旧的 framework 字段）
+  const availableFrameworks = useMemo(() => {
     const set = new Set<string>();
     for (const agent of agents) {
-      if (agent.framework) set.add(agent.framework);
+      const fws = agent.frameworks || (agent.framework ? [agent.framework] : []);
+      for (const fw of fws) {
+        if (fw) set.add(fw);
+      }
     }
-    return ["全部", ...Array.from(set)];
+    return Array.from(set).sort();
   }, [agents]);
+
+  function toggleFramework(framework: string) {
+    setSelectedFrameworks((current) =>
+      current.includes(framework)
+        ? current.filter((f) => f !== framework)
+        : [...current, framework],
+    );
+  }
 
   const visibleAgents = useMemo(() => {
     const q = query.trim().toLowerCase();
     return agents.filter((agent) => {
-      const matchesFilter = selected === "全部" || agent.framework === selected;
+      // 类别筛选
+      const matchesCategory = !selectedCategory || agent.category === selectedCategory;
+
+      // 框架筛选（多选，命中任一即可）
+      const agentFws = agent.frameworks || (agent.framework ? [agent.framework] : []);
+      const matchesFramework =
+        selectedFrameworks.length === 0 ||
+        agentFws.some((fw) => selectedFrameworks.includes(fw));
+
+      // 搜索词筛选
       const matchesQuery =
         !q ||
         agent.name.toLowerCase().includes(q) ||
         (agent.description ?? "").toLowerCase().includes(q);
-      return matchesFilter && matchesQuery;
+
+      return matchesCategory && matchesFramework && matchesQuery;
     });
-  }, [agents, selected, query]);
+  }, [agents, selectedCategory, selectedFrameworks, query]);
 
   return (
-    <>
-      {/* 搜索框 */}
-      <input
-        type="text"
-        value={query}
-        onChange={(event) => setQuery(event.target.value)}
-        placeholder="🔍 搜索 agent..."
-        className="mb-6 w-full rounded-md border border-zinc-300 bg-white px-4 py-2.5 text-sm text-zinc-900 placeholder-zinc-500 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-200"
-      />
+    <div className="grid gap-8 lg:grid-cols-[200px_1fr]">
+      {/* 左侧筛选栏 */}
+      <aside>
+        {/* 类别筛选 */}
+        <div className="mb-6">
+          <p className="mb-3 text-sm font-semibold">类别</p>
+          <div className="space-y-2">
+            <label className="flex cursor-pointer items-center gap-2 text-sm">
+              <input
+                type="radio"
+                checked={selectedCategory === null}
+                onChange={() => setSelectedCategory(null)}
+                className="h-4 w-4"
+              />
+              <span>全部</span>
+            </label>
+            {agentCategories.map((cat) => (
+              <label key={cat.value} className="flex cursor-pointer items-center gap-2 text-sm text-zinc-600 dark:text-zinc-300">
+                <input
+                  type="radio"
+                  checked={selectedCategory === cat.value}
+                  onChange={() => setSelectedCategory(cat.value)}
+                  className="h-4 w-4"
+                />
+                <span>{cat.label}</span>
+              </label>
+            ))}
+          </div>
+        </div>
 
-      {/* 筛选标签 */}
-      <div className="flex flex-wrap gap-2 mb-8 text-sm">
-        {filters.map((filter) => (
-          <button
-            key={filter}
-            type="button"
-            onClick={() => setSelected(filter)}
-            className={`rounded-md px-3 py-1.5 ${
-              selected === filter
-                ? "bg-zinc-700 text-white"
-                : "border border-zinc-300 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:border-zinc-400 dark:hover:border-zinc-500"
-            }`}
-          >
-            {filter}
-          </button>
-        ))}
-      </div>
+        {/* 框架筛选 */}
+        <div>
+          <p className="mb-3 text-sm font-semibold">框架</p>
+          {availableFrameworks.length === 0 ? (
+            <p className="text-sm text-zinc-500">暂无框架</p>
+          ) : (
+            <div className="space-y-2">
+              {availableFrameworks.map((fw) => (
+                <label key={fw} className="flex cursor-pointer items-center gap-2 text-sm text-zinc-600 dark:text-zinc-300">
+                  <input
+                    type="checkbox"
+                    checked={selectedFrameworks.includes(fw)}
+                    onChange={() => toggleFramework(fw)}
+                    className="h-4 w-4 rounded border-zinc-400 dark:border-zinc-600"
+                  />
+                  <span className="font-mono text-xs">{fw}</span>
+                </label>
+              ))}
+            </div>
+          )}
+        </div>
+      </aside>
 
-      {/* Agent 卡片网格 */}
-      {visibleAgents.length === 0 ? (
-        <p className="py-10 text-center text-sm text-zinc-500">没有匹配的 agent。</p>
-      ) : (
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-        {visibleAgents.map((agent) => (
-          <Link
-            key={agent.id}
-            href={`/agents/${agent.id}`}
-            className="block rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/40 p-5 hover:border-zinc-300 dark:hover:border-zinc-600"
-          >
-            <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-full bg-purple-500/20 flex items-center justify-center">🤖</div>
-              <div>
-                <div className="font-semibold">{agent.name}</div>
-                <div className="text-xs font-mono text-zinc-500">{agent.framework}</div>
-              </div>
-            </div>
-            <p className="mt-4 text-sm text-zinc-600 dark:text-zinc-400 line-clamp-2">{agent.description}</p>
-            <div className="mt-4 flex gap-4 text-xs text-zinc-500">
-              <span>{agent.skills_count ?? 0} skills</span>
-              <span>{agent.posts_count ?? 0} 帖</span>
-            </div>
-          </Link>
-        ))}
+      {/* 右侧：搜索 + Agent 卡片 */}
+      <div>
+        {/* 搜索框 */}
+        <input
+          type="text"
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder="🔍 搜索 agent..."
+          className="mb-6 w-full rounded-md border border-zinc-300 bg-white px-4 py-2.5 text-sm text-zinc-900 placeholder-zinc-500 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-200"
+        />
+
+        {/* Agent 卡片网格 */}
+        {visibleAgents.length === 0 ? (
+          <p className="py-10 text-center text-sm text-zinc-500">没有匹配的 agent。</p>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            {visibleAgents.map((agent) => {
+              const agentFws = agent.frameworks || (agent.framework ? [agent.framework] : []);
+              return (
+                <Link
+                  key={agent.id}
+                  href={`/agents/${agent.id}`}
+                  className="block rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/40 p-5 hover:border-zinc-300 dark:hover:border-zinc-600"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-full bg-purple-500/20 flex items-center justify-center">🤖</div>
+                    <div className="min-w-0 flex-1">
+                      <div className="font-semibold truncate">{agent.name}</div>
+                      <div className="text-xs text-zinc-500">
+                        {agentCategoryLabel(agent.category)}
+                      </div>
+                    </div>
+                  </div>
+                  <p className="mt-4 text-sm text-zinc-600 dark:text-zinc-400 line-clamp-2">
+                    {agent.description}
+                  </p>
+                  {agentFws.length > 0 && (
+                    <div className="mt-3 flex flex-wrap gap-1">
+                      {agentFws.map((fw) => (
+                        <span
+                          key={fw}
+                          className="rounded bg-purple-100 dark:bg-purple-500/10 px-2 py-0.5 text-xs font-mono text-purple-700 dark:text-purple-300"
+                        >
+                          {fw}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  <div className="mt-4 flex gap-4 text-xs text-zinc-500">
+                    <span>{agent.skills_count ?? 0} skills</span>
+                    <span>{agent.posts_count ?? 0} 帖</span>
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+        )}
       </div>
-      )}
-    </>
+    </div>
   );
 }

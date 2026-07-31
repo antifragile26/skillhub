@@ -9,13 +9,13 @@ import PublishPageShell, {
 } from "@/components/PublishPageShell";
 import { buildAgentPayload } from "@/lib/contentPayloads";
 import { supabase } from "@/lib/supabase";
-
-const agentCategories = ["研究分析", "代码开发", "内容创作", "自动化工作流", "其他"];
+import { agentCategories, agentFrameworks } from "@/lib/agentConstants";
 
 export default function NewAgentPage() {
   const router = useRouter();
   const [name, setName] = useState("");
-  const [framework, setFramework] = useState(agentCategories[0]);
+  const [category, setCategory] = useState(agentCategories[0].value);
+  const [frameworks, setFrameworks] = useState("");
   const [description, setDescription] = useState("");
   const [repo, setRepo] = useState("");
   const [message, setMessage] = useState("");
@@ -40,7 +40,8 @@ export default function NewAgentPage() {
     const payload = buildAgentPayload(
       {
         name,
-        framework,
+        category,
+        frameworks,
         description: repo.trim() ? `${description.trim()}\n\n入口：${repo.trim()}` : description,
       },
       data.user.id,
@@ -81,15 +82,31 @@ export default function NewAgentPage() {
             </label>
             <select
               id="agent-category"
-              value={framework}
-              onChange={(event) => setFramework(event.target.value)}
+              value={category}
+              onChange={(event) => setCategory(event.target.value)}
               className={inputClassName}
             >
-              {agentCategories.map((category) => (
-                <option key={category}>{category}</option>
+              {agentCategories.map((cat) => (
+                <option key={cat.value} value={cat.value}>{cat.label}</option>
               ))}
             </select>
           </div>
+        </div>
+
+        <div>
+          <label className={labelClassName} htmlFor="agent-frameworks">
+            支持的框架
+          </label>
+          <input
+            id="agent-frameworks"
+            value={frameworks}
+            onChange={(event) => setFrameworks(event.target.value)}
+            className={inputClassName}
+            placeholder="用空格或逗号分隔，例如：LangGraph CrewAI AutoGen"
+          />
+          <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+            可选：{agentFrameworks.join("、")}
+          </p>
         </div>
 
         <div>
