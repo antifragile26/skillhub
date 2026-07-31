@@ -6,15 +6,21 @@ import {
   buildSkillPayload,
 } from "./contentPayloads.ts";
 
-test("buildAgentPayload trims fields and attaches the current user", () => {
+test("buildAgentPayload trims fields, parses frameworks, and attaches the current user", () => {
   assert.deepEqual(
     buildAgentPayload(
-      { name: " Research Agent ", framework: " 研究分析 ", description: " Helps research. " },
+      {
+        name: " Research Agent ",
+        category: " research ",
+        frameworks: "LangGraph, CrewAI  AutoGen",
+        description: " Helps research. ",
+      },
       "user-1",
     ),
     {
       name: "Research Agent",
-      framework: "研究分析",
+      category: "research",
+      frameworks: ["LangGraph", "CrewAI", "AutoGen"],
       description: "Helps research.",
       user_id: "user-1",
     },

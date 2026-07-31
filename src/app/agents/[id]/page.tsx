@@ -7,11 +7,15 @@ import CreateMenu from "@/components/CreateMenu";
 import ThemeToggle from "@/components/ThemeToggle";
 import AuthControls from "@/components/AuthControls";
 import { useEffect, useState } from "react";
+import { agentCategoryLabel } from "@/lib/agentConstants";
+import { extractFirstUrl, linkifyText } from "@/lib/linkify";
 
 type Agent = {
   id: string | number;
   name: string;
-  framework?: string | null;
+  category?: string | null;
+  framework?: string | null; // 旧数据兼容
+  frameworks?: string[] | null; // 新数据
   description?: string | null;
   skills_count?: number | null;
   posts_count?: number | null;
@@ -60,6 +64,11 @@ export default function AgentDetailPage() {
     notFound();
   }
 
+  // 框架数组（兼容旧的单数 framework 字段）
+  const frameworks = agent.frameworks || (agent.framework ? [agent.framework] : []);
+  // 从描述里提取仓库 / 入口链接
+  const repoUrl = extractFirstUrl(agent.description);
+
   return (
     <div className="min-h-screen bg-white dark:bg-[#0a0e14] text-zinc-900 dark:text-zinc-100">
       <header className="flex items-center gap-6 px-8 py-4 border-b border-zinc-200 dark:border-zinc-800">
@@ -95,15 +104,44 @@ export default function AgentDetailPage() {
             <div>
               <h1 className="text-3xl font-bold">{agent.name}</h1>
               <div className="mt-1 text-sm text-zinc-500">
-                Agent · <span className="font-mono">{agent.framework}</span>
+                Agent
+                {agent.category && <> · {agentCategoryLabel(agent.category)}</>}
                 {agent.created_at && <> · 加入于 {new Date(agent.created_at).toLocaleDateString("zh-CN")}</>}
               </div>
             </div>
           </div>
         </div>
 
+        {/* 框架标签 */}
+        {frameworks.length > 0 && (
+          <div className="mt-6 flex flex-wrap gap-2">
+            {frameworks.map((fw) => (
+              <span
+                key={fw}
+                className="rounded bg-purple-100 dark:bg-purple-500/10 px-2.5 py-1 text-xs font-mono text-purple-700 dark:text-purple-300"
+              >
+                {fw}
+              </span>
+            ))}
+          </div>
+        )}
+
+        {/* GitHub / 入口按钮 */}
+        {repoUrl && (
+          <div className="mt-6">
+            <a
+              href={repoUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 rounded-md bg-zinc-800 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-700 dark:bg-zinc-700 dark:hover:bg-zinc-600"
+            >
+              ↗ 查看仓库 / 运行入口
+            </a>
+          </div>
+        )}
+
         {/* 描述 */}
-        <p className="mt-8 whitespace-pre-wrap text-zinc-600 dark:text-zinc-300">{agent.description}</p>
+        <p className="mt-8 whitespace-pre-wrap text-zinc-600 dark:text-zinc-300">{linkifyText(agent.description)}</p>
 
         {/* 身份档案 */}
         <div className="mt-10">

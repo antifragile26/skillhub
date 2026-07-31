@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { extractFirstUrl, linkifyText } from "@/lib/linkify";
 
 type Skill = {
   id: string | number;
@@ -16,6 +17,7 @@ const tabs = ["README", "Versions", "Discussions", "Reviews", "Security"] as con
 
 export default function SkillDetail({ skill }: { skill: Skill }) {
   const [tab, setTab] = useState<(typeof tabs)[number]>("README");
+  const repoUrl = extractFirstUrl(skill.description);
 
   return (
     <div className="grid gap-8 lg:grid-cols-[1fr_320px]">
@@ -54,7 +56,7 @@ export default function SkillDetail({ skill }: { skill: Skill }) {
         <div className="mt-6">
           {tab === "README" ? (
             <p className="whitespace-pre-wrap text-zinc-700 dark:text-zinc-300">
-              {skill.description || "作者暂未填写说明。"}
+              {skill.description ? linkifyText(skill.description) : "作者暂未填写说明。"}
             </p>
           ) : (
             <p className="text-sm text-zinc-500">暂无内容。</p>
@@ -64,6 +66,17 @@ export default function SkillDetail({ skill }: { skill: Skill }) {
 
       {/* 右侧信息卡片 */}
       <aside className="space-y-4">
+        {repoUrl && (
+          <a
+            href={repoUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center justify-center gap-2 rounded-lg bg-zinc-800 px-4 py-2.5 text-sm font-medium text-white hover:bg-zinc-700 dark:bg-zinc-700 dark:hover:bg-zinc-600"
+          >
+            ↗ 查看源码仓库
+          </a>
+        )}
+
         <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/40 p-5">
           <p className="mb-3 text-sm font-medium">安装</p>
           <pre className="overflow-x-auto rounded bg-white dark:bg-zinc-950 p-3 font-mono text-sm text-green-600 dark:text-green-400">
