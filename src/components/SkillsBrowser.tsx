@@ -58,6 +58,7 @@ function mapToCategory(tag: string): string {
 export default function SkillsBrowser({ skills }: { skills: Skill[] }) {
   const [query, setQuery] = useState("");
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+  const [selectedTags, setSelectedTags] = useState<string[]>([]); // 原始标签筛选
   const [sort, setSort] = useState<SortKey>("downloads");
 
   // 从所有 Skill 的 tags 计算出大分类（去重、排序）
@@ -71,11 +72,35 @@ export default function SkillsBrowser({ skills }: { skills: Skill[] }) {
     return Array.from(set).sort();
   }, [skills]);
 
+  // 获取某个大分类下的所有原始标签
+  const getTagsForCategory = (category: string): string[] => {
+    const tags = new Set<string>();
+    for (const skill of skills) {
+      for (const tag of skill.tags ?? []) {
+        if (mapToCategory(tag) === category) {
+          tags.add(tag);
+        }
+      }
+    }
+    return Array.from(tags).sort();
+  };
+
   function toggleCategory(category: string) {
     setSelectedCategories((current) =>
       current.includes(category)
         ? current.filter((c) => c !== category)
         : [...current, category],
+    );
+    // 取消大分类时，清除该分类下的所有原始标签选择
+    if (selectedCategories.includes(category)) {
+      const tagsInCategory = getTagsForCategory(category);
+      setSelectedTags((current) => current.filter((t) => !tagsInCategory.includes(t)));
+    }
+  }
+
+  function toggleTag(tag: string) {
+    setSelectedTags((current) =>
+      current.includes(tag) ? current.filter((t) => t !== tag) : [...current, tag],
     );
   }
 
@@ -87,13 +112,22 @@ export default function SkillsBrowser({ skills }: { skills: Skill[] }) {
         !q ||
         skill.name.toLowerCase().includes(q) ||
         (skill.description ?? "").toLowerCase().includes(q);
-      // 大分类筛选：勾选的取并集，skill 的任一标签映射到大分类即命中
-      const matchesCategory =
-        selectedCategories.length === 0 ||
-        (skill.tags ?? []).some((tag) =>
+
+      // 筛选逻辑：
+      // 1. 如果选了原始标签，优先按原始标签筛选（精确匹配）
+      // 2. 否则按大分类筛选（模糊匹配）
+      let matchesFilter = true;
+      if (selectedTags.length > 0) {
+        // 选了原始标签：skill 的 tags 必须包含至少一个选中的原始标签
+        matchesFilter = (skill.tags ?? []).some((tag) => selectedTags.includes(tag));
+      } else if (selectedCategories.length > 0) {
+        // 只选了大分类：skill 的任一标签映射到选中的大分类
+        matchesFilter = (skill.tags ?? []).some((tag) =>
           selectedCategories.includes(mapToCategory(tag)),
         );
-      return matchesQuery && matchesCategory;
+      }
+
+      return matchesQuery && matchesFilter;
     });
 
     if (sort === "downloads") {
@@ -105,7 +139,7 @@ export default function SkillsBrowser({ skills }: { skills: Skill[] }) {
       );
     }
     return list;
-  }, [skills, query, selectedCategories, sort]);
+  }, [skills, query, selectedCategories, selectedTags, sort]);
 
   return (
     <div className="grid gap-8 lg:grid-cols-[200px_1fr]">
@@ -115,18 +149,43 @@ export default function SkillsBrowser({ skills }: { skills: Skill[] }) {
         {categories.length === 0 ? (
           <p className="text-sm text-zinc-500">暂无分类</p>
         ) : (
-          <div className="space-y-3">
-            {categories.map((category) => (
-              <label key={category} className="flex cursor-pointer items-center gap-2 text-sm text-zinc-600 dark:text-zinc-300">
-                <input
-                  type="checkbox"
-                  checked={selectedCategories.includes(category)}
-                  onChange={() => toggleCategory(category)}
-                  className="h-4 w-4 rounded border-zinc-400 dark:border-zinc-600"
-                />
-                <span>{category}</span>
-              </label>
-            ))}
+          <div className="space-y-2">
+            {categories.map((category) => {
+              const isExpanded = selectedCategories.includes(category);
+              const tagsInCategory = isExpanded ? getTagsForCategory(category) : [];
+              return (
+                <div key={category}>
+                  <label className="flex cursor-pointer items-center gap-2 text-sm font-medium text-zinc-700 dark:text-zinc-200">
+                    <input
+                      type="checkbox"
+                      checked={isExpanded}
+                      onChange={() => toggleCategory(category)}
+                      className="h-4 w-4 rounded border-zinc-400 dark:border-zinc-600"
+                    />
+                    <span>{category}</span>
+                  </label>
+                  {/* 展开显示该分类下的原始标签 */}
+                  {isExpanded && tagsInCategory.length > 0 && (
+                    <div className="ml-6 mt-2 space-y-1.5">
+                      {tagsInCategory.map((tag) => (
+                        <label
+                          key={tag}
+                          className="flex cursor-pointer items-center gap-2 text-xs text-zinc-600 dark:text-zinc-400"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={selectedTags.includes(tag)}
+                            onChange={() => toggleTag(tag)}
+                            className="h-3.5 w-3.5 rounded border-zinc-400 dark:border-zinc-600"
+                          />
+                          <span className="font-mono">{tag}</span>
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
       </aside>
