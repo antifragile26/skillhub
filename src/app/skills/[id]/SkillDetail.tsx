@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { extractFirstUrl, linkifyText } from "@/lib/linkify";
+import { supabase } from "@/lib/supabase";
 
 type Skill = {
   id: string | number;
@@ -11,13 +12,31 @@ type Skill = {
   downloads?: number | null;
   tags?: string[] | null;
   created_at?: string | null;
+  repo_url?: string | null;
+  file_path?: string | null;
 };
 
 const tabs = ["README", "Versions", "Discussions", "Reviews", "Security"] as const;
 
 export default function SkillDetail({ skill }: { skill: Skill }) {
   const [tab, setTab] = useState<(typeof tabs)[number]>("README");
-  const repoUrl = extractFirstUrl(skill.description);
+  const repoUrl = skill.repo_url || extractFirstUrl(skill.description);
+  const hasFile = !!skill.file_path;
+
+  async function handleDownload() {
+    if (hasFile && skill.file_path) {
+      // 下载文件包
+      const { data } = supabase.storage.from("packages").getPublicUrl(skill.file_path);
+      window.open(data.publicUrl, "_blank");
+      // 计数 +1
+      await supabase.rpc("increment_skill_downloads", { skill_id: skill.id });
+    } else if (repoUrl) {
+      // 跳转仓库
+      window.open(repoUrl, "_blank");
+      // 计数 +1
+      await supabase.rpc("increment_skill_downloads", { skill_id: skill.id });
+    }
+  }
 
   return (
     <div className="grid gap-8 lg:grid-cols-[1fr_320px]">
@@ -66,36 +85,27 @@ export default function SkillDetail({ skill }: { skill: Skill }) {
 
       {/* 右侧信息卡片 */}
       <aside className="space-y-4">
-        {repoUrl && (
-          <a
-            href={repoUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center justify-center gap-2 rounded-lg bg-zinc-800 px-4 py-2.5 text-sm font-medium text-white hover:bg-zinc-700 dark:bg-zinc-700 dark:hover:bg-zinc-600"
+        {(hasFile || repoUrl) && (
+          <button
+            onClick={handleDownload}
+            className="w-full flex items-center justify-center gap-2 rounded-lg bg-green-600 px-4 py-3 text-sm font-medium text-white hover:bg-green-500"
           >
-            ↗ 查看源码仓库
-          </a>
+            {hasFile ? "⬇ 下载文件包" : "↗ 查看源码仓库"}
+          </button>
         )}
-
-        <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/40 p-5">
-          <p className="mb-3 text-sm font-medium">安装</p>
-          <pre className="overflow-x-auto rounded bg-white dark:bg-zinc-950 p-3 font-mono text-sm text-green-600 dark:text-green-400">
-            <code>{`skillhub install ${skill.name}`}</code>
-          </pre>
-        </div>
 
         <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/40 p-5 text-sm">
           <div className="flex items-center justify-between py-1">
-            <span className="text-zinc-500">许可证</span>
-            <span className="font-mono">MIT</span>
+            <span className="text-zinc-500">总下载量</span>
+            <span className="font-semibold">{skill.downloads ?? 0}</span>
           </div>
           <div className="flex items-center justify-between py-1">
-            <span className="text-zinc-500">总安装量</span>
-            <span>{skill.downloads ?? 0}</span>
+            <span className="text-zinc-500">当前版本</span>
+            <span className="font-mono text-xs">{skill.version ?? "0.1.0"}</span>
           </div>
           <div className="flex items-center justify-between py-1">
             <span className="text-zinc-500">评分</span>
-            <span>★ 0.0 (0)</span>
+            <span className="text-zinc-400">未标注</span>
           </div>
         </div>
 

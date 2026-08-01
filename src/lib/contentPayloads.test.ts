@@ -14,6 +14,7 @@ test("buildAgentPayload trims fields, parses frameworks, and attaches the curren
         category: " research ",
         frameworks: "LangGraph, CrewAI  AutoGen",
         description: " Helps research. ",
+        repoUrl: " https://github.com/x/agent ",
       },
       "user-1",
     ),
@@ -22,9 +23,28 @@ test("buildAgentPayload trims fields, parses frameworks, and attaches the curren
       category: "research",
       frameworks: ["LangGraph", "CrewAI", "AutoGen"],
       description: "Helps research.",
+      repo_url: "https://github.com/x/agent",
+      file_path: null,
+      downloads: 0,
       user_id: "user-1",
     },
   );
+});
+
+test("buildAgentPayload rejects non-http repo urls and keeps file_path", () => {
+  const payload = buildAgentPayload(
+    {
+      name: "A",
+      category: "other",
+      frameworks: "",
+      description: "d",
+      repoUrl: "javascript:alert(1)",
+      filePath: "packages/agents/a.zip",
+    },
+    "user-x",
+  );
+  assert.equal(payload.repo_url, null);
+  assert.equal(payload.file_path, "packages/agents/a.zip");
 });
 
 test("buildSkillPayload parses tags and defaults version/downloads", () => {
@@ -39,6 +59,8 @@ test("buildSkillPayload parses tags and defaults version/downloads", () => {
       description: "Automates pages.",
       downloads: 0,
       tags: ["web", "浏览器", "cli"],
+      repo_url: null,
+      file_path: null,
       user_id: "user-2",
     },
   );

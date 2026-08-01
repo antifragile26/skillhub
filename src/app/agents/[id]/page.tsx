@@ -21,6 +21,9 @@ type Agent = {
   posts_count?: number | null;
   created_at?: string | null;
   user_id?: string | null;
+  repo_url?: string | null;
+  file_path?: string | null;
+  downloads?: number | null;
 };
 
 export default function AgentDetailPage() {
@@ -56,18 +59,35 @@ export default function AgentDetailPage() {
     router.push("/agents");
   }
 
+  async function handleDownload() {
+    if (!agent) return;
+    const hasFile = !!agent.file_path;
+    const repoUrl = agent.repo_url || extractFirstUrl(agent.description);
+
+    if (hasFile && agent.file_path) {
+      const { data } = supabase.storage.from("packages").getPublicUrl(agent.file_path);
+      window.open(data.publicUrl, "_blank");
+      await supabase.rpc("increment_agent_downloads", { agent_id: agent.id });
+    } else if (repoUrl) {
+      window.open(repoUrl, "_blank");
+      await supabase.rpc("increment_agent_downloads", { agent_id: agent.id });
+    }
+  }
+
   if (isLoading) {
     return <div className="min-h-screen bg-white dark:bg-[#0a0e14] text-zinc-900 dark:text-zinc-100 p-8">加载中...</div>;
   }
 
   if (!agent) {
-    notFound();
+    return <div className="min-h-screen bg-white dark:bg-[#0a0e14] text-zinc-900 dark:text-zinc-100 p-8">未找到该 Agent。</div>;
   }
 
   // 框架数组（兼容旧的单数 framework 字段）
   const frameworks = agent.frameworks || (agent.framework ? [agent.framework] : []);
-  // 从描述里提取仓库 / 入口链接
-  const repoUrl = extractFirstUrl(agent.description);
+  // 从描述里提取仓库 / 入口链接（repo_url 优先）
+  const repoUrl = agent.repo_url || extractFirstUrl(agent.description);
+  const hasFile = !!agent.file_path;
+  const hasDownloadSource = hasFile || !!repoUrl;
 
   return (
     <div className="min-h-screen bg-white dark:bg-[#0a0e14] text-zinc-900 dark:text-zinc-100">
@@ -126,17 +146,18 @@ export default function AgentDetailPage() {
           </div>
         )}
 
-        {/* GitHub / 入口按钮 */}
-        {repoUrl && (
+        {/* 下载/获取按钮 */}
+        {hasDownloadSource && (
           <div className="mt-6">
-            <a
-              href={repoUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 rounded-md bg-zinc-800 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-700 dark:bg-zinc-700 dark:hover:bg-zinc-600"
+            <button
+              onClick={handleDownload}
+              className="inline-flex items-center gap-2 rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-500"
             >
-              ↗ 查看仓库 / 运行入口
-            </a>
+              {hasFile ? "⬇ 下载文件包" : "↗ 查看仓库 / 运行入口"}
+            </button>
+            <p className="mt-2 text-sm text-zinc-500">
+              下载量：<span className="font-semibold">{agent.downloads ?? 0}</span>
+            </p>
           </div>
         )}
 

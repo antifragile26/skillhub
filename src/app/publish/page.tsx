@@ -16,6 +16,8 @@ export default function PublishPage() {
   const [version, setVersion] = useState("0.1.0");
   const [description, setDescription] = useState("");
   const [tags, setTags] = useState("");
+  const [repoUrl, setRepoUrl] = useState("");
+  const [file, setFile] = useState<File | null>(null);
   const [message, setMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -35,9 +37,24 @@ export default function PublishPage() {
       return;
     }
 
+    let filePath: string | undefined;
+    if (file) {
+      const fileName = `${Date.now()}-${file.name}`;
+      const { error: uploadError } = await supabase.storage
+        .from("packages")
+        .upload(`skills/${fileName}`, file, { upsert: false });
+
+      if (uploadError) {
+        setMessage(`文件上传失败：${uploadError.message}`);
+        setIsSubmitting(false);
+        return;
+      }
+      filePath = `skills/${fileName}`;
+    }
+
     const { error } = await supabase
       .from("skills")
-      .insert(buildSkillPayload({ name, version, description, tags }, data.user.id));
+      .insert(buildSkillPayload({ name, version, description, tags, repoUrl, filePath }, data.user.id));
 
     if (error) {
       setMessage(`发布失败：${error.message}`);
@@ -114,6 +131,34 @@ export default function PublishPage() {
             className={inputClassName}
             placeholder="用空格或逗号分隔，例如：browser automation cli"
           />
+        </div>
+
+        <div>
+          <label className={labelClassName} htmlFor="skill-repo">
+            仓库地址（可选）
+          </label>
+          <input
+            id="skill-repo"
+            type="url"
+            value={repoUrl}
+            onChange={(event) => setRepoUrl(event.target.value)}
+            className={inputClassName}
+            placeholder="https://github.com/yourname/skill"
+          />
+        </div>
+
+        <div>
+          <label className={labelClassName} htmlFor="skill-file">
+            上传文件包（可选）
+          </label>
+          <input
+            id="skill-file"
+            type="file"
+            accept=".zip,.md,.json,.txt"
+            onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+            className={inputClassName}
+          />
+          <p className="mt-1 text-xs text-zinc-500">支持 .zip、.md、.json、.txt 等格式，最大 50MB</p>
         </div>
 
         {message && <p className="text-sm text-red-600 dark:text-red-400">{message}</p>}

@@ -18,6 +18,7 @@ export default function NewAgentPage() {
   const [selectedFrameworks, setSelectedFrameworks] = useState<string[]>([]);
   const [description, setDescription] = useState("");
   const [repo, setRepo] = useState("");
+  const [file, setFile] = useState<File | null>(null);
   const [message, setMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -45,12 +46,29 @@ export default function NewAgentPage() {
       return;
     }
 
+    let filePath: string | undefined;
+    if (file) {
+      const fileName = `${Date.now()}-${file.name}`;
+      const { error: uploadError } = await supabase.storage
+        .from("packages")
+        .upload(`agents/${fileName}`, file, { upsert: false });
+
+      if (uploadError) {
+        setMessage(`文件上传失败：${uploadError.message}`);
+        setIsSubmitting(false);
+        return;
+      }
+      filePath = `agents/${fileName}`;
+    }
+
     const payload = buildAgentPayload(
       {
         name,
         category,
         frameworks: selectedFrameworks.join(" "),
-        description: repo.trim() ? `${description.trim()}\n\n入口：${repo.trim()}` : description,
+        description,
+        repoUrl: repo,
+        filePath,
       },
       data.user.id,
     );
@@ -147,6 +165,20 @@ export default function NewAgentPage() {
             className={`${inputClassName} min-h-36 resize-y`}
             placeholder="它能做什么？适合哪些场景？需要哪些环境变量？"
           />
+        </div>
+
+        <div>
+          <label className={labelClassName} htmlFor="agent-file">
+            上传文件包（可选）
+          </label>
+          <input
+            id="agent-file"
+            type="file"
+            accept=".zip,.md,.json,.txt"
+            onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+            className={inputClassName}
+          />
+          <p className="mt-1 text-xs text-zinc-500">支持 .zip、.md、.json、.txt 等格式，最大 50MB</p>
         </div>
 
         {message && <p className="text-sm text-red-600 dark:text-red-400">{message}</p>}

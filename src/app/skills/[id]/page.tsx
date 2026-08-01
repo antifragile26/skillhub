@@ -58,7 +58,7 @@ export default function SkillDetailPage() {
   }
 
   if (!skill) {
-    notFound();
+    return <div className="min-h-screen bg-white dark:bg-[#0a0e14] text-zinc-900 dark:text-zinc-100 p-8">未找到该 Skill。</div>;
   }
 
   return (
