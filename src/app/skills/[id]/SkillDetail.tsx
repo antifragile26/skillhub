@@ -16,7 +16,8 @@ type Skill = {
   file_path?: string | null;
 };
 
-const tabs = ["README", "Versions", "Discussions", "Reviews", "Security"] as const;
+// 目前只有 README 有真实内容，其余 tab 待实现前先不展示
+const tabs = ["README"] as const;
 
 export default function SkillDetail({ skill }: { skill: Skill }) {
   const [tab, setTab] = useState<(typeof tabs)[number]>("README");

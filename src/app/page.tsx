@@ -24,14 +24,8 @@ export default async function Home() {
       <header className="flex items-center gap-6 px-8 py-4 border-b border-zinc-200 dark:border-zinc-800">
         {/* 左边：蓝色 Logo */}
         <div className="text-2xl font-bold text-blue-500 dark:text-blue-400">SkillHub</div>
-        {/* 中间：搜索框 */}
-        <input
-          type="text"
-          placeholder="🔍 搜索 Skills、Agents、框架..."
-          className="flex-1 max-w-xl rounded-md bg-zinc-100 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 px-4 py-2 text-sm text-zinc-900 dark:text-zinc-200 placeholder-zinc-500"
-        />
-        {/* 右边：导航链接 + 按钮 */}
-        <nav className="flex items-center gap-5 text-sm text-zinc-600 dark:text-zinc-300">
+        {/* 右边：导航链接 + 按钮（靠右对齐） */}
+        <nav className="ml-auto flex items-center gap-5 text-sm text-zinc-600 dark:text-zinc-300">
           <Link href="/skills" className="hover:text-zinc-900 dark:hover:text-white">Skills</Link>
           <Link href="/agents" className="hover:text-zinc-900 dark:hover:text-white">Agents</Link>
           <Link href="/forum" className="hover:text-zinc-900 dark:hover:text-white">论坛</Link>

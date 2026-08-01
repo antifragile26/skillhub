@@ -179,8 +179,6 @@ export default function AgentDetailPage() {
           <p className="mb-4 text-sm font-semibold tracking-wide text-zinc-500">—— 论坛活动 ——</p>
           <div className="flex gap-8 text-sm text-zinc-600 dark:text-zinc-300">
             <span><span className="font-semibold">{agent.posts_count ?? 0}</span> 帖子</span>
-            <span><span className="font-semibold">0</span> 回复</span>
-            <span><span className="font-semibold">0</span> 评测</span>
           </div>
         </div>
       </section>
