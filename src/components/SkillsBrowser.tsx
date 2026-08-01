@@ -19,23 +19,63 @@ const sortLabels: Record<SortKey, string> = {
   latest: "最新发布",
 };
 
+// 标签到大分类的映射
+const tagCategoryMap: Record<string, string> = {
+  // 开发与代码
+  git: "开发与代码",
+  github: "开发与代码",
+  vcs: "开发与代码",
+  // 网络与接口
+  api: "网络与接口",
+  http: "网络与接口",
+  fetch: "网络与接口",
+  // 数据与数据库
+  database: "数据与数据库",
+  postgres: "数据与数据库",
+  sqlite: "数据与数据库",
+  // 浏览器与设备
+  browser: "浏览器与设备",
+  // 自动化与系统
+  automation: "自动化与系统",
+  filesystem: "自动化与系统",
+  // 知识与记忆
+  "knowledge-graph": "知识与记忆",
+  memory: "知识与记忆",
+  search: "知识与记忆",
+  // 平台连接与通信
+  mcp: "平台连接与通信",
+  messaging: "平台连接与通信",
+  slack: "平台连接与通信",
+  // AI/模型相关
+  claude: "AI/模型相关",
+};
+
+// 把原始标签映射到大分类
+function mapToCategory(tag: string): string {
+  return tagCategoryMap[tag.toLowerCase()] || "其他";
+}
+
 export default function SkillsBrowser({ skills }: { skills: Skill[] }) {
   const [query, setQuery] = useState("");
-  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [sort, setSort] = useState<SortKey>("downloads");
 
-  // 从所有 Skill 的 tags 里动态汇总出可选标签（去重、排序）
-  const allTags = useMemo(() => {
+  // 从所有 Skill 的 tags 计算出大分类（去重、排序）
+  const categories = useMemo(() => {
     const set = new Set<string>();
     for (const skill of skills) {
-      for (const tag of skill.tags ?? []) set.add(tag);
+      for (const tag of skill.tags ?? []) {
+        set.add(mapToCategory(tag));
+      }
     }
     return Array.from(set).sort();
   }, [skills]);
 
-  function toggleTag(tag: string) {
-    setSelectedTags((current) =>
-      current.includes(tag) ? current.filter((t) => t !== tag) : [...current, tag],
+  function toggleCategory(category: string) {
+    setSelectedCategories((current) =>
+      current.includes(category)
+        ? current.filter((c) => c !== category)
+        : [...current, category],
     );
   }
 
@@ -47,11 +87,13 @@ export default function SkillsBrowser({ skills }: { skills: Skill[] }) {
         !q ||
         skill.name.toLowerCase().includes(q) ||
         (skill.description ?? "").toLowerCase().includes(q);
-      // 标签：勾选的取并集，tags 命中任一即可
-      const matchesTag =
-        selectedTags.length === 0 ||
-        (skill.tags ?? []).some((tag) => selectedTags.includes(tag));
-      return matchesQuery && matchesTag;
+      // 大分类筛选：勾选的取并集，skill 的任一标签映射到大分类即命中
+      const matchesCategory =
+        selectedCategories.length === 0 ||
+        (skill.tags ?? []).some((tag) =>
+          selectedCategories.includes(mapToCategory(tag)),
+        );
+      return matchesQuery && matchesCategory;
     });
 
     if (sort === "downloads") {
@@ -63,26 +105,26 @@ export default function SkillsBrowser({ skills }: { skills: Skill[] }) {
       );
     }
     return list;
-  }, [skills, query, selectedTags, sort]);
+  }, [skills, query, selectedCategories, sort]);
 
   return (
     <div className="grid gap-8 lg:grid-cols-[200px_1fr]">
       {/* 左侧筛选栏 */}
       <aside>
-        <p className="mb-4 text-sm font-semibold">标签</p>
-        {allTags.length === 0 ? (
-          <p className="text-sm text-zinc-500">暂无标签</p>
+        <p className="mb-4 text-sm font-semibold">分类</p>
+        {categories.length === 0 ? (
+          <p className="text-sm text-zinc-500">暂无分类</p>
         ) : (
           <div className="space-y-3">
-            {allTags.map((tag) => (
-              <label key={tag} className="flex cursor-pointer items-center gap-2 text-sm text-zinc-600 dark:text-zinc-300">
+            {categories.map((category) => (
+              <label key={category} className="flex cursor-pointer items-center gap-2 text-sm text-zinc-600 dark:text-zinc-300">
                 <input
                   type="checkbox"
-                  checked={selectedTags.includes(tag)}
-                  onChange={() => toggleTag(tag)}
+                  checked={selectedCategories.includes(category)}
+                  onChange={() => toggleCategory(category)}
                   className="h-4 w-4 rounded border-zinc-400 dark:border-zinc-600"
                 />
-                <span className="font-mono">{tag}</span>
+                <span>{category}</span>
               </label>
             ))}
           </div>
