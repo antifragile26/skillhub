@@ -18,6 +18,7 @@ type ContentItem = {
   framework?: string;
   version?: string;
   created_at?: string;
+  post_id?: string;
 };
 
 type ContentGroups = {
@@ -46,19 +47,39 @@ function ContentSection({ title, items, href, action, kind }: {
         <div className="border-y border-zinc-200 py-6 text-sm text-zinc-500 dark:border-zinc-800 dark:text-zinc-400">还没有相关内容。</div>
       ) : (
         <div className="grid gap-3 sm:grid-cols-2">
-          {items.map((item) => (
-            <article key={item.id} className="rounded-lg border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-800 dark:bg-zinc-900/40">
-              <div className="flex items-start justify-between gap-3">
-                <h3 className="font-medium text-zinc-900 dark:text-zinc-100">
-                  {kind === "post" ? item.title : kind === "comment" ? "论坛回复" : item.name}
-                </h3>
-                {kind === "agent" && item.framework && <span className="text-xs text-zinc-500">{item.framework}</span>}
-                {kind === "skill" && item.version && <span className="text-xs text-zinc-500">v{item.version}</span>}
-              </div>
-              {(item.description || item.content) && <p className="mt-2 line-clamp-2 text-sm text-zinc-600 dark:text-zinc-400">{item.description || item.content}</p>}
-              {item.created_at && <p className="mt-3 text-xs text-zinc-500">{new Date(item.created_at).toLocaleDateString("zh-CN")}</p>}
-            </article>
-          ))}
+          {items.map((item) => {
+            // 每类内容跳到对应详情页；评论跳到它所属的帖子
+            const itemHref =
+              kind === "agent" ? `/agents/${item.id}`
+              : kind === "skill" ? `/skills/${item.id}`
+              : kind === "post" ? `/forum/${item.id}`
+              : item.post_id ? `/forum/${item.post_id}`
+              : null;
+
+            const card = (
+              <>
+                <div className="flex items-start justify-between gap-3">
+                  <h3 className="font-medium text-zinc-900 dark:text-zinc-100">
+                    {kind === "post" ? item.title : kind === "comment" ? "论坛回复" : item.name}
+                  </h3>
+                  {kind === "agent" && item.framework && <span className="text-xs text-zinc-500">{item.framework}</span>}
+                  {kind === "skill" && item.version && <span className="text-xs text-zinc-500">v{item.version}</span>}
+                </div>
+                {(item.description || item.content) && <p className="mt-2 line-clamp-2 text-sm text-zinc-600 dark:text-zinc-400">{item.description || item.content}</p>}
+                {item.created_at && <p className="mt-3 text-xs text-zinc-500">{new Date(item.created_at).toLocaleDateString("zh-CN")}</p>}
+              </>
+            );
+
+            const cardClass = "block rounded-lg border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-800 dark:bg-zinc-900/40";
+
+            return itemHref ? (
+              <Link key={item.id} href={itemHref} className={`${cardClass} transition hover:border-zinc-300 dark:hover:border-zinc-600`}>
+                {card}
+              </Link>
+            ) : (
+              <article key={item.id} className={cardClass}>{card}</article>
+            );
+          })}
         </div>
       )}
     </section>
@@ -85,7 +106,7 @@ export default function MyPage() {
         supabase.from("agents").select("id, name, framework, description, created_at").eq("user_id", data.user.id).order("created_at", { ascending: false }),
         supabase.from("skills").select("id, name, version, description, created_at").eq("user_id", data.user.id).order("created_at", { ascending: false }),
         supabase.from("posts").select("id, title, content, created_at").eq("user_id", data.user.id).order("created_at", { ascending: false }),
-        supabase.from("comments").select("id, content, created_at").eq("user_id", data.user.id).order("created_at", { ascending: false }),
+        supabase.from("comments").select("id, content, created_at, post_id").eq("user_id", data.user.id).order("created_at", { ascending: false }),
       ]);
       const firstError = [agents.error, skills.error, posts.error, comments.error].find(Boolean);
 
