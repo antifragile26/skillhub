@@ -27,15 +27,7 @@ export default function RootLayout({
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">
-        {children}
-        {/* TODO: 临时的大爱心，部署测试用，之后删掉 */}
-        <div className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center">
-          <span className="text-[20rem] leading-none animate-pulse select-none">
-            ❤️
-          </span>
-        </div>
-      </body>
+      <body className="min-h-full flex flex-col">{children}</body>
     </html>
   );
 }
