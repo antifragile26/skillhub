@@ -45,6 +45,22 @@ export default function NewPostPage() {
       return;
     }
 
+    // 取回刚发布帖子的 id，触发后台生成语义向量（失败不阻塞发帖流程）
+    const { data: created } = await supabase
+      .from("posts")
+      .select("id")
+      .eq("user_id", data.user.id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (created?.id) {
+      void fetch("/api/embed-post", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ postId: created.id }),
+      }).catch(() => {});
+    }
+
     router.push("/forum");
   }
 

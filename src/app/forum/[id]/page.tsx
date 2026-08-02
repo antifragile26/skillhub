@@ -40,6 +40,14 @@ type CurrentUser = {
   } | null;
 };
 
+type RelatedPost = {
+  id: string;
+  title: string;
+  category?: string | null;
+  author?: string | null;
+  similarity?: number | null;
+};
+
 export default function PostDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -58,6 +66,7 @@ export default function PostDetailPage() {
   const [message, setMessage] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [related, setRelated] = useState<RelatedPost[]>([]);
 
   useEffect(() => {
     async function loadUser() {
@@ -111,6 +120,19 @@ export default function PostDetailPage() {
 
     void loadPostAndComments();
   }, [postId, user]);
+
+  // 语义相关推荐：调用数据库 match_posts 函数，纯 DB 计算，不依赖外网
+  useEffect(() => {
+    async function loadRelated() {
+      if (!postId) return;
+      const { data, error } = await supabase.rpc("match_posts", {
+        query_post_id: Number(postId),
+        match_count: 5,
+      });
+      if (!error && data) setRelated(data as RelatedPost[]);
+    }
+    void loadRelated();
+  }, [postId]);
 
   async function handleUpvote() {
     if (!postId || !user) {
@@ -251,12 +273,7 @@ export default function PostDetailPage() {
     <div className="min-h-screen bg-white text-zinc-900 dark:bg-[#0a0e14] dark:text-zinc-100">
       <header className="flex items-center gap-6 border-b border-zinc-200 px-8 py-4 dark:border-zinc-800">
         <Link href="/" className="text-2xl font-bold text-blue-500 dark:text-blue-400">SkillHub</Link>
-        <input
-          type="text"
-          placeholder="搜索 Skills、Agents、框架..."
-          className="max-w-xl flex-1 rounded-md border border-zinc-300 bg-white px-4 py-2 text-sm text-zinc-900 placeholder-zinc-500 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-200"
-        />
-        <nav className="flex items-center gap-5 text-sm text-zinc-600 dark:text-zinc-300">
+        <nav className="ml-auto flex items-center gap-5 text-sm text-zinc-600 dark:text-zinc-300">
           <Link href="/skills" className="hover:text-zinc-900 dark:hover:text-white">Skills</Link>
           <Link href="/agents" className="hover:text-zinc-900 dark:hover:text-white">Agents</Link>
           <Link href="/forum" className="hover:text-zinc-900 dark:hover:text-white">论坛</Link>
@@ -322,6 +339,31 @@ export default function PostDetailPage() {
             </span>
           </div>
         </article>
+
+        {related.length > 0 && (
+          <div className="mt-8">
+            <h2 className="mb-4 text-xl font-bold">🔗 相关推荐</h2>
+            <div className="space-y-2">
+              {related.map((item) => (
+                <Link
+                  key={item.id}
+                  href={`/forum/${item.id}`}
+                  className="flex items-center justify-between gap-4 rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-3 transition hover:border-zinc-300 dark:border-zinc-800 dark:bg-zinc-900/40 dark:hover:border-zinc-600"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate font-medium text-zinc-900 dark:text-zinc-100">{item.title}</p>
+                    <p className="mt-0.5 text-xs text-zinc-500">
+                      {categoryLabel(item.category) || "综合讨论"} · {item.author || "用户"}
+                    </p>
+                  </div>
+                  {typeof item.similarity === "number" && (
+                    <span className="shrink-0 text-xs text-zinc-400">相似度 {(item.similarity * 100).toFixed(0)}%</span>
+                  )}
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div className="mt-8">
           <h2 className="mb-4 text-xl font-bold">回复 ({comments.length})</h2>
