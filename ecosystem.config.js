@@ -5,7 +5,7 @@ module.exports = {
       name: "skillhub",
       script: "node_modules/next/dist/bin/next",
       args: "start",
-      cwd: "/var/www/skillhub",
+      cwd: "/var/www/skillhub/current",
       instances: 1,
       autorestart: true,
       watch: false,
@@ -13,6 +13,8 @@ module.exports = {
       env: {
         NODE_ENV: "production",
         PORT: 3000,
+        DEPLOY_COMMIT_SHA: process.env.DEPLOY_COMMIT_SHA || "unknown",
+        DEPLOYED_AT: process.env.DEPLOYED_AT || null,
       },
     },
   ],
