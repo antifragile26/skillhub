@@ -23,7 +23,7 @@ export default function ForumBrowser({ posts }: { posts: Post[] }) {
 
   const visiblePosts = useMemo(() => {
     const q = query.trim().toLowerCase();
-    let list = posts.filter((p) => {
+    const list = posts.filter((p) => {
       const matchesCategory = !category || p.category === category;
       const matchesQuery =
         !q ||
