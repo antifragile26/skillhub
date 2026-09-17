@@ -1,6 +1,6 @@
 "use client";
 
-import { notFound, useParams, useRouter } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import CreateMenu from "@/components/CreateMenu";
@@ -20,12 +20,16 @@ type Skill = {
   user_id?: string | null;
 };
 
+type CurrentUser = {
+  id: string;
+};
+
 export default function SkillDetailPage() {
   const params = useParams();
   const router = useRouter();
   const id = Array.isArray(params.id) ? params.id[0] : params.id;
   const [skill, setSkill] = useState<Skill | null>(null);
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<CurrentUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {

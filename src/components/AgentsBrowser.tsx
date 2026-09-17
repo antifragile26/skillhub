@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { agentCategories, agentCategoryLabel, agentFrameworks } from "@/lib/agentConstants";
+import { agentCategories, agentCategoryLabel } from "@/lib/agentConstants";
 
 type Agent = {
   id: string | number;
