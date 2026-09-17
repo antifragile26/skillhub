@@ -14,7 +14,7 @@ module.exports = {
         NODE_ENV: "production",
         PORT: 3000,
         DEPLOY_COMMIT_SHA: process.env.DEPLOY_COMMIT_SHA || "unknown",
-        DEPLOYED_AT: process.env.DEPLOYED_AT || null,
+        DEPLOYED_AT: process.env.DEPLOYED_AT || "unknown",
       },
     },
   ],
