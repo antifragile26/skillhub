@@ -20,4 +20,7 @@ jobs:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           key_path: /tmp/deploy_key
-          script: bash /var/www/skillhub/deploy.sh
+          envs: RELEASE_SHA
+          script: bash /var/www/skillhub/deploy.sh "$RELEASE_SHA"
+        env:
+          RELEASE_SHA: ${{ github.sha }}
