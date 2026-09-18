@@ -9,7 +9,7 @@
 
 ## 发布前置
 
-1. 在隔离项目执行 `supabase/migrations/20260918000000_forum_batch_1.sql`，确认 posts/comments/votes 行数、抽样正文、投票计数和可恢复备份。
+1. 在隔离项目依次执行 `supabase/migrations/20260918000000_forum_batch_1.sql` 和 `supabase/migrations/20260918010000_comment_votes.sql`，确认 posts/comments/votes/comment_votes 行数、抽样正文、投票计数和可恢复备份。
 2. 使用隔离 V/U1/U2 完成 AT01–AT22 中的身份、RLS、并发、邮件和性能测试。
 3. 在隔离环境演练旧版本回滚与新增列兼容；审核功能尚未启用，本批回滚不涉及审核状态。
 4. 本地候选提交推送/传输到服务器后，按 `deploy.sh <40位SHA>` 建 release；禁止直接覆盖 current。
