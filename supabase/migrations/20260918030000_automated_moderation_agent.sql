@@ -159,6 +159,43 @@ create trigger comments_auto_moderation
   before insert or update of content, status on public.comments
   for each row execute function public.auto_moderate_comment_row();
 
+create or replace function public.clear_manual_post_flag()
+returns trigger language plpgsql security definer set search_path = public, pg_temp as $$
+begin
+  if new.status = 'published' and new.moderated_by is not null and new.automated_review_status = 'flagged' then
+    update public.posts
+       set automated_review_status = 'clean',
+           automated_review_reason = '人工复核通过',
+           automated_reviewed_at = now()
+     where id = new.id;
+  end if;
+  return new;
+end;
+$$;
+
+create or replace function public.clear_manual_comment_flag()
+returns trigger language plpgsql security definer set search_path = public, pg_temp as $$
+begin
+  if new.status = 'published' and new.moderated_by is not null and new.automated_review_status = 'flagged' then
+    update public.comments
+       set automated_review_status = 'clean',
+           automated_review_reason = '人工复核通过',
+           automated_reviewed_at = now()
+     where id = new.id;
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists posts_clear_manual_flag on public.posts;
+create trigger posts_clear_manual_flag
+  after update of status on public.posts
+  for each row execute function public.clear_manual_post_flag();
+drop trigger if exists comments_clear_manual_flag on public.comments;
+create trigger comments_clear_manual_flag
+  after update of status on public.comments
+  for each row execute function public.clear_manual_comment_flag();
+
 grant execute on function public.auto_moderation_score(text) to authenticated;
 
 create or replace function public.get_automated_moderation_queue(p_limit integer default 50)
