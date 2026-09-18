@@ -1,6 +1,6 @@
 "use client"; // 这行的意思：这个页面要能响应用户的输入和点击（叫"客户端页面"）
 
-import { useState } from "react";
+import { FormEvent, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
 import ThemeToggle from "@/components/ThemeToggle";
@@ -16,7 +16,9 @@ export default function RegisterPage() {
   const [message, setMessage] = useState(""); // 用来显示成功/错误提示
 
   // 点"创建账号"时，运行这个函数
-  async function handleRegister() {
+  async function handleRegister(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (password.length < 8) { setMessage("密码至少需要 8 个字符。"); return; }
     setMessage("正在创建...");
 
     // 调用 Supabase 的注册功能，把邮箱密码交给它（它会自动加密处理）
@@ -44,7 +46,7 @@ export default function RegisterPage() {
         <ThemeToggle />
       </div>
 
-      <div className="w-full max-w-md rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/40 p-8">
+      <form onSubmit={handleRegister} className="w-full max-w-md rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/40 p-8">
         <h1 className="text-2xl font-bold text-center mb-6">注册 SkillHub</h1>
 
         {/* 邮箱 */}
@@ -86,7 +88,7 @@ export default function RegisterPage() {
 
         {/* 创建账号按钮 */}
         <button
-          onClick={handleRegister}
+          type="submit"
           className="w-full rounded-md bg-green-600 py-2.5 font-medium text-white hover:bg-green-500"
         >
           创建账号
@@ -98,7 +100,7 @@ export default function RegisterPage() {
         <p className="mt-4 text-center text-sm text-zinc-500">
           已有账号？ <a href="/login" className="text-blue-600 dark:text-blue-400 hover:underline">登录</a>
         </p>
-      </div>
+      </form>
     </div>
   );
 }

@@ -26,11 +26,10 @@ export default function PublishPageShell({
         <Link href="/" className="text-2xl font-bold text-blue-500 dark:text-blue-400">
           SkillHub
         </Link>
-        <input
-          type="text"
-          placeholder="搜索 Skills、Agents、论坛..."
-          className="flex-1 rounded-md border border-zinc-300 bg-white px-4 py-2 text-sm text-zinc-900 placeholder-zinc-500 outline-none focus:border-blue-500 dark:border-zinc-700 dark:bg-[#0f141c] dark:text-zinc-200"
-        />
+        <form action="/forum" method="get" className="flex-1">
+          <label htmlFor="global-forum-search" className="sr-only">搜索论坛</label>
+          <input id="global-forum-search" name="q" type="search" placeholder="搜索论坛" className="w-full rounded-md border border-zinc-300 bg-white px-4 py-2 text-sm text-zinc-900 placeholder-zinc-500 outline-none focus:border-blue-500 dark:border-zinc-700 dark:bg-[#0f141c] dark:text-zinc-200" />
+        </form>
         <nav className="flex items-center gap-5 text-sm text-zinc-600 dark:text-zinc-300">
           <Link href="/skills" className="hover:text-zinc-900 dark:hover:text-white">
             Skills

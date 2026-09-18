@@ -6,408 +6,66 @@ import { useEffect, useMemo, useState } from "react";
 import AuthControls from "@/components/AuthControls";
 import CreateMenu from "@/components/CreateMenu";
 import ThemeToggle from "@/components/ThemeToggle";
-import { buildCommentPayload } from "@/lib/contentPayloads";
+import SafeMarkdown from "@/components/SafeMarkdown";
 import { getProfileDisplay } from "@/lib/profile";
 import { categoryLabel } from "@/lib/forumCategories";
+import { makeRequestId, normalizeForumText, validatePostInput, validateReplyInput } from "@/lib/forumValidation";
 import { supabase } from "@/lib/supabase";
 
-type Post = {
-  id: string;
-  title: string;
-  content?: string | null;
-  category?: string | null;
-  author?: string | null;
-  created_at?: string | null;
-  upvotes?: number | null;
-  downvotes?: number | null;
-  user_id?: string | null;
-};
-
-type Comment = {
-  id: string;
-  post_id: string;
-  user_id: string;
-  content: string;
-  created_at: string;
-};
-
-type CurrentUser = {
-  id: string;
-  email?: string | null;
-  user_metadata?: {
-    display_name?: string | null;
-    username?: string | null;
-  } | null;
-};
-
-type RelatedPost = {
-  id: string;
-  title: string;
-  category?: string | null;
-  author?: string | null;
-  similarity?: number | null;
-};
+type Post = { id: string; title: string; content?: string | null; category?: string | null; author?: string | null; created_at?: string | null; updated_at?: string | null; upvotes?: number | null; downvotes?: number | null; user_id?: string | null; deleted_at?: string | null };
+type Comment = { id: string; post_id: string; user_id: string; author?: string | null; content: string; created_at: string; updated_at?: string | null };
+type CurrentUser = { id: string; email?: string | null; user_metadata?: { display_name?: string | null; username?: string | null } | null };
+type RelatedPost = { id: string; title: string; category?: string | null; author?: string | null; similarity?: number | null };
 
 export default function PostDetailPage() {
-  const params = useParams();
-  const router = useRouter();
-  const postId = useMemo(() => {
-    const id = params.id;
-    return Array.isArray(id) ? id[0] : id;
-  }, [params.id]);
+  const params = useParams(); const router = useRouter();
+  const postId = useMemo(() => { const id = params.id; return Array.isArray(id) ? id[0] : id; }, [params.id]);
+  const [post, setPost] = useState<Post | null>(null); const [upvotes, setUpvotes] = useState(0); const [downvotes, setDownvotes] = useState(0); const [myVote, setMyVote] = useState<"up" | "down" | null>(null); const [replyText, setReplyText] = useState(""); const [comments, setComments] = useState<Comment[]>([]); const [user, setUser] = useState<CurrentUser | null>(null); const [message, setMessage] = useState(""); const [isLoading, setIsLoading] = useState(true); const [isSubmitting, setIsSubmitting] = useState(false); const [voteBusy, setVoteBusy] = useState(false); const [editingPost, setEditingPost] = useState(false); const [editTitle, setEditTitle] = useState(""); const [editContent, setEditContent] = useState(""); const [editingComment, setEditingComment] = useState<string | null>(null); const [editCommentText, setEditCommentText] = useState(""); const [related, setRelated] = useState<RelatedPost[]>([]);
 
-  const [post, setPost] = useState<Post | null>(null);
-  const [upvotes, setUpvotes] = useState(0);
-  const [downvotes, setDownvotes] = useState(0);
-  const [myVote, setMyVote] = useState<"up" | "down" | null>(null);
-  const [replyText, setReplyText] = useState("");
-  const [comments, setComments] = useState<Comment[]>([]);
-  const [user, setUser] = useState<CurrentUser | null>(null);
-  const [message, setMessage] = useState("");
-  const [isLoading, setIsLoading] = useState(true);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [related, setRelated] = useState<RelatedPost[]>([]);
-
+  useEffect(() => { void supabase.auth.getUser().then(({ data }) => setUser(data.user as CurrentUser | null)); }, []);
   useEffect(() => {
-    async function loadUser() {
-      const { data } = await supabase.auth.getUser();
-      setUser(data.user as CurrentUser | null);
+    async function load() {
+      if (!postId) return; setIsLoading(true); setMessage("");
+      let postResult = await supabase.from("posts").select("*").eq("id", postId).is("deleted_at", null).maybeSingle();
+      if (postResult.error) postResult = await supabase.from("posts").select("*").eq("id", postId).maybeSingle();
+      const commentsQuery = await supabase.from("comments").select("id, post_id, user_id, author, content, created_at, updated_at").eq("post_id", postId).is("deleted_at", null).order("created_at", { ascending: true });
+      const commentsResult = commentsQuery.error ? await supabase.from("comments").select("id, post_id, user_id, content, created_at").eq("post_id", postId).order("created_at", { ascending: true }) : commentsQuery;
+      const voteResult = user ? await supabase.from("votes").select("vote_type").eq("post_id", postId).eq("user_id", user.id).maybeSingle() : { data: null, error: null };
+      if (postResult.data && !postResult.data.deleted_at) { const loaded = postResult.data as Post; setPost(loaded); setEditTitle(loaded.title); setEditContent(loaded.content ?? ""); setUpvotes(loaded.upvotes ?? 0); setDownvotes(loaded.downvotes ?? 0); } else setMessage(postResult.error ? "帖子加载失败，请重试。" : "帖子不存在、已删除或暂时不可见。");
+      if (commentsResult.error) setMessage("回复加载失败，请重试。"); else setComments((commentsResult.data ?? []) as Comment[]);
+      setMyVote(voteResult.data?.vote_type === "up" || voteResult.data?.vote_type === "down" ? voteResult.data.vote_type : null); setIsLoading(false);
     }
-
-    void loadUser();
-  }, []);
-
-  useEffect(() => {
-    async function loadPostAndComments() {
-      if (!postId) return;
-
-      setIsLoading(true);
-      const [postResult, commentsResult, voteResult] = await Promise.all([
-        supabase.from("posts").select("*").eq("id", postId).single(),
-        supabase
-          .from("comments")
-          .select("id, post_id, user_id, content, created_at")
-          .eq("post_id", postId)
-          .order("created_at", { ascending: true }),
-        user
-          ? supabase
-              .from("votes")
-              .select("vote_type")
-              .eq("post_id", postId)
-              .eq("user_id", user.id)
-              .maybeSingle()
-          : Promise.resolve({ data: null, error: null }),
-      ]);
-
-      if (postResult.data) {
-        setPost(postResult.data as Post);
-        setUpvotes(postResult.data.upvotes ?? 0);
-        setDownvotes(postResult.data.downvotes ?? 0);
-      }
-
-      if (commentsResult.error) {
-        setMessage(`评论加载失败：${commentsResult.error.message}`);
-      } else {
-        setComments((commentsResult.data ?? []) as Comment[]);
-      }
-
-      if (voteResult.data) {
-        setMyVote(voteResult.data.vote_type as "up" | "down");
-      }
-
-      setIsLoading(false);
-    }
-
-    void loadPostAndComments();
+    void load();
   }, [postId, user]);
+  useEffect(() => { if (!postId) return; void supabase.rpc("match_posts", { query_post_id: Number(postId), match_count: 5 }).then(({ data, error }) => { if (!error && data) setRelated(data as RelatedPost[]); }); }, [postId]);
 
-  // 语义相关推荐：调用数据库 match_posts 函数，纯 DB 计算，不依赖外网
-  useEffect(() => {
-    async function loadRelated() {
-      if (!postId) return;
-      const { data, error } = await supabase.rpc("match_posts", {
-        query_post_id: Number(postId),
-        match_count: 5,
-      });
-      if (!error && data) setRelated(data as RelatedPost[]);
-    }
-    void loadRelated();
-  }, [postId]);
-
-  async function handleUpvote() {
-    if (!postId || !user) {
-      router.push("/login");
-      return;
-    }
-
-    const isRemoving = myVote === "up";
-    const isChanging = myVote === "down";
-    const prev = { upvotes, downvotes, myVote };
-
-    // 乐观更新 UI
-    if (isRemoving) {
-      setUpvotes((v) => v - 1);
-      setMyVote(null);
-    } else if (isChanging) {
-      setUpvotes((v) => v + 1);
-      setDownvotes((v) => v - 1);
-      setMyVote("up");
-    } else {
-      setUpvotes((v) => v + 1);
-      setMyVote("up");
-    }
-
-    // 只操作 votes 表，posts 的计数由数据库触发器自动同步
-    let error;
-    if (isRemoving) {
-      ({ error } = await supabase.from("votes").delete().eq("post_id", postId).eq("user_id", user.id));
-    } else if (isChanging) {
-      ({ error } = await supabase.from("votes").update({ vote_type: "up" }).eq("post_id", postId).eq("user_id", user.id));
-    } else {
-      ({ error } = await supabase.from("votes").insert({ user_id: user.id, post_id: postId, vote_type: "up" }));
-    }
-
-    if (error) {
-      // 失败回滚
-      setUpvotes(prev.upvotes);
-      setDownvotes(prev.downvotes);
-      setMyVote(prev.myVote);
-      setMessage(`操作失败：${error.message}`);
-    }
+  async function refreshStats() { if (!postId) return; const { data } = await supabase.from("posts").select("upvotes, downvotes").eq("id", postId).maybeSingle(); if (data) { setUpvotes(data.upvotes ?? 0); setDownvotes(data.downvotes ?? 0); } }
+  async function changeVote(kind: "up" | "down") {
+    if (!postId || !user || voteBusy) { if (!user) router.push(`/login?returnTo=${encodeURIComponent(`/forum/${postId}`)}`); return; }
+    setVoteBusy(true); setMessage(""); const requestId = makeRequestId(); const limit = await supabase.rpc("check_forum_rate_limit", { p_action: "vote", p_request_id: requestId });
+    if (limit.error || !(limit.data as { allowed?: boolean } | null)?.allowed) { setMessage(limit.error ? "投票服务尚未完成数据库升级，请稍后重试。" : "投票过于频繁，请稍后再试。"); setVoteBusy(false); return; }
+    const removing = myVote === kind; let error;
+    if (removing) ({ error } = await supabase.from("votes").delete().eq("post_id", postId).eq("user_id", user.id));
+    else ({ error } = await supabase.from("votes").upsert({ user_id: user.id, post_id: postId, vote_type: kind }, { onConflict: "user_id,post_id" }));
+    if (error) setMessage(`投票失败：${error.message}`); else { setMyVote(removing ? null : kind); await refreshStats(); }
+    setVoteBusy(false);
   }
-
-  async function handleDownvote() {
-    if (!postId || !user) {
-      router.push("/login");
-      return;
-    }
-
-    const isRemoving = myVote === "down";
-    const isChanging = myVote === "up";
-    const prev = { upvotes, downvotes, myVote };
-
-    // 乐观更新 UI
-    if (isRemoving) {
-      setDownvotes((v) => v - 1);
-      setMyVote(null);
-    } else if (isChanging) {
-      setDownvotes((v) => v + 1);
-      setUpvotes((v) => v - 1);
-      setMyVote("down");
-    } else {
-      setDownvotes((v) => v + 1);
-      setMyVote("down");
-    }
-
-    // 只操作 votes 表，posts 的计数由数据库触发器自动同步
-    let error;
-    if (isRemoving) {
-      ({ error } = await supabase.from("votes").delete().eq("post_id", postId).eq("user_id", user.id));
-    } else if (isChanging) {
-      ({ error } = await supabase.from("votes").update({ vote_type: "down" }).eq("post_id", postId).eq("user_id", user.id));
-    } else {
-      ({ error } = await supabase.from("votes").insert({ user_id: user.id, post_id: postId, vote_type: "down" }));
-    }
-
-    if (error) {
-      setUpvotes(prev.upvotes);
-      setDownvotes(prev.downvotes);
-      setMyVote(prev.myVote);
-      setMessage(`操作失败：${error.message}`);
-    }
-  }
-
   async function handleReply() {
-    if (!postId || !replyText.trim()) return;
-
-    if (!user) {
-      router.push("/login");
-      return;
-    }
-
-    setIsSubmitting(true);
-    setMessage("");
-
-    const { data, error } = await supabase
-      .from("comments")
-      .insert(buildCommentPayload(postId, user.id, replyText))
-      .select("id, post_id, user_id, content, created_at")
-      .single();
-
-    if (error) {
-      setMessage(`回复失败：${error.message}`);
-      setIsSubmitting(false);
-      return;
-    }
-
-    setComments((current) => [...current, data as Comment]);
-    setReplyText("");
+    const validation = validateReplyInput(replyText); if (validation) { setMessage(validation); return; }
+    if (!postId || !user) { router.push(`/login?returnTo=${encodeURIComponent(`/forum/${postId}`)}`); return; }
+    setIsSubmitting(true); setMessage(""); const requestId = makeRequestId(); const limit = await supabase.rpc("check_forum_rate_limit", { p_action: "reply", p_request_id: requestId });
+    if (limit.error || !(limit.data as { allowed?: boolean } | null)?.allowed) { setMessage(limit.error ? "回复服务尚未完成数据库升级，请稍后重试。" : "回复过于频繁，请 1 分钟后再试。"); setIsSubmitting(false); return; }
+    const { data, error } = await supabase.from("comments").upsert({ post_id: postId, user_id: user.id, author: getProfileDisplay(user).name, content: normalizeForumText(replyText), request_id: requestId }, { onConflict: "user_id,request_id" }).select("id, post_id, user_id, author, content, created_at, updated_at").single();
+    if (error) setMessage(`回复失败：${error.message}`); else { setComments((current) => current.some((item) => item.id === data.id) ? current : [...current, data as Comment]); setReplyText(""); }
     setIsSubmitting(false);
   }
+  async function savePost() { if (!post || !user || post.user_id !== user.id) return; const errors = validatePostInput(editTitle, editContent, post.category ?? ""); if (errors.title || errors.content) { setMessage(errors.title || errors.content || "内容不符合要求。"); return; } const { data, error } = await supabase.from("posts").update({ title: normalizeForumText(editTitle), content: normalizeForumText(editContent) }).eq("id", post.id).eq("user_id", user.id).select("*").single(); if (error) setMessage(`保存失败：${error.message}`); else { setPost(data as Post); setEditingPost(false); setMessage("帖子已保存。"); } }
+  async function deletePost() { if (!post || !user || post.user_id !== user.id || !window.confirm("确定软删除这个帖子吗？删除后公开页面不可见。")) return; const { error } = await supabase.from("posts").update({ deleted_at: new Date().toISOString() }).eq("id", post.id).eq("user_id", user.id); if (error) setMessage(`删除失败：${error.message}`); else router.replace("/forum"); }
+  async function saveComment(comment: Comment) { const validation = validateReplyInput(editCommentText); if (validation) { setMessage(validation); return; } const { data, error } = await supabase.from("comments").update({ content: normalizeForumText(editCommentText) }).eq("id", comment.id).eq("user_id", user?.id ?? "").select("id, post_id, user_id, author, content, created_at, updated_at").single(); if (error) setMessage(`保存回复失败：${error.message}`); else { setComments((items) => items.map((item) => item.id === comment.id ? data as Comment : item)); setEditingComment(null); } }
+  async function deleteComment(comment: Comment) { if (!user || comment.user_id !== user.id || !window.confirm("确定删除这条回复吗？")) return; const { error } = await supabase.from("comments").update({ deleted_at: new Date().toISOString() }).eq("id", comment.id).eq("user_id", user.id); if (error) setMessage(`删除回复失败：${error.message}`); else setComments((items) => items.filter((item) => item.id !== comment.id)); }
 
-  async function handleDeletePost() {
-    if (!postId || !user || !post) return;
-    if (post.user_id !== user.id) {
-      setMessage("只能删除自己的帖子。");
-      return;
-    }
-
-    if (!confirm("确定要删除这个帖子吗？删除后无法恢复。")) return;
-
-    const { error } = await supabase.from("posts").delete().eq("id", postId);
-    if (error) {
-      setMessage(`删除失败：${error.message}`);
-      return;
-    }
-
-    router.push("/forum");
-  }
-
-  if (isLoading || !post) {
-    return <div className="min-h-screen bg-white p-8 text-zinc-900 dark:bg-[#0a0e14] dark:text-zinc-100">加载中...</div>;
-  }
-
+  if (isLoading) return <div className="min-h-screen p-8 text-zinc-900 dark:bg-[#0a0e14] dark:text-zinc-100">正在加载帖子...</div>;
+  if (!post) return <div className="min-h-screen p-8 text-zinc-900 dark:bg-[#0a0e14] dark:text-zinc-100"><Link href="/forum" className="text-blue-600 hover:underline">← 返回论坛</Link><p className="mt-8" role="alert">{message || "帖子不存在或暂时不可见。"}</p></div>;
   const currentProfile = user ? getProfileDisplay(user) : null;
-
-  return (
-    <div className="min-h-screen bg-white text-zinc-900 dark:bg-[#0a0e14] dark:text-zinc-100">
-      <header className="flex items-center gap-6 border-b border-zinc-200 px-8 py-4 dark:border-zinc-800">
-        <Link href="/" className="text-2xl font-bold text-blue-500 dark:text-blue-400">SkillHub</Link>
-        <nav className="ml-auto flex items-center gap-5 text-sm text-zinc-600 dark:text-zinc-300">
-          <Link href="/skills" className="hover:text-zinc-900 dark:hover:text-white">Skills</Link>
-          <Link href="/agents" className="hover:text-zinc-900 dark:hover:text-white">Agents</Link>
-          <Link href="/forum" className="hover:text-zinc-900 dark:hover:text-white">论坛</Link>
-          <CreateMenu />
-          <ThemeToggle />
-          <AuthControls />
-        </nav>
-      </header>
-
-      <section className="mx-auto max-w-4xl px-8 py-10">
-        <Link href="/forum" className="mb-6 inline-block text-blue-600 hover:underline dark:text-blue-400">← 返回论坛</Link>
-
-        <article className="rounded-lg border border-zinc-200 bg-zinc-50 p-6 dark:border-zinc-800 dark:bg-zinc-900/40">
-          <div className="mb-4">
-            <span className="rounded-md bg-zinc-700 px-3 py-1 text-xs text-zinc-100">{categoryLabel(post.category) || "综合讨论"}</span>
-          </div>
-
-          <div className="mb-4 flex items-start justify-between">
-            <h1 className="text-2xl font-bold">{post.title}</h1>
-            {user && post.user_id === user.id && (
-              <button
-                type="button"
-                onClick={handleDeletePost}
-                className="rounded-md border border-red-300 px-3 py-1 text-sm text-red-600 hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-950"
-              >
-                删除
-              </button>
-            )}
-          </div>
-
-          <div className="mb-6 flex items-center gap-2 text-sm">
-            <span className="rounded-md bg-blue-600 px-2 py-1 text-xs font-medium text-white">作者</span>
-            <span className="text-zinc-600 dark:text-zinc-400">{post.author || "用户"}</span>
-            {post.created_at && (
-              <>
-                <span className="text-zinc-500">·</span>
-                <span className="text-zinc-500">{new Date(post.created_at).toLocaleDateString("zh-CN")}</span>
-              </>
-            )}
-          </div>
-
-          <p className="mb-6 whitespace-pre-wrap leading-relaxed text-zinc-700 dark:text-zinc-300">
-            {post.content || "这个帖子还没有正文。"}
-          </p>
-
-          <div className="flex items-center gap-6 border-t border-zinc-200 pt-4 text-sm dark:border-zinc-700">
-            <button
-              type="button"
-              onClick={handleUpvote}
-              className={`flex items-center gap-1 ${myVote === "up" ? "text-green-600 font-semibold" : "hover:text-green-600"}`}
-            >
-              👍 <span>{upvotes}</span>
-            </button>
-            <button
-              type="button"
-              onClick={handleDownvote}
-              className={`flex items-center gap-1 ${myVote === "down" ? "text-red-600 font-semibold" : "hover:text-red-600"}`}
-            >
-              👎 <span>{downvotes}</span>
-            </button>
-            <span className="flex items-center gap-1 text-zinc-500">
-              💬 <span>{comments.length} 回复</span>
-            </span>
-          </div>
-        </article>
-
-        {related.length > 0 && (
-          <div className="mt-8">
-            <h2 className="mb-4 text-xl font-bold">🔗 相关推荐</h2>
-            <div className="space-y-2">
-              {related.map((item) => (
-                <Link
-                  key={item.id}
-                  href={`/forum/${item.id}`}
-                  className="flex items-center justify-between gap-4 rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-3 transition hover:border-zinc-300 dark:border-zinc-800 dark:bg-zinc-900/40 dark:hover:border-zinc-600"
-                >
-                  <div className="min-w-0">
-                    <p className="truncate font-medium text-zinc-900 dark:text-zinc-100">{item.title}</p>
-                    <p className="mt-0.5 text-xs text-zinc-500">
-                      {categoryLabel(item.category) || "综合讨论"} · {item.author || "用户"}
-                    </p>
-                  </div>
-                  {typeof item.similarity === "number" && (
-                    <span className="shrink-0 text-xs text-zinc-400">相似度 {(item.similarity * 100).toFixed(0)}%</span>
-                  )}
-                </Link>
-              ))}
-            </div>
-          </div>
-        )}
-
-        <div className="mt-8">
-          <h2 className="mb-4 text-xl font-bold">回复 ({comments.length})</h2>
-
-          <div className="mb-6 space-y-4">
-            {comments.length === 0 ? (
-              <div className="border-y border-zinc-200 py-6 text-sm text-zinc-500 dark:border-zinc-800 dark:text-zinc-400">还没有回复。</div>
-            ) : (
-              comments.map((comment) => (
-                <article key={comment.id} className="rounded-lg border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-800 dark:bg-zinc-900/40">
-                  <div className="mb-2 flex items-center gap-2">
-                    <span className="rounded-md bg-blue-600 px-2 py-0.5 text-xs text-white">
-                      {comment.user_id === user?.id ? "我" : "用户"}
-                    </span>
-                    <span className="text-sm font-medium">
-                      {comment.user_id === user?.id ? currentProfile?.name : "社区用户"}
-                    </span>
-                    <span className="text-xs text-zinc-500">· {new Date(comment.created_at).toLocaleString("zh-CN")}</span>
-                  </div>
-                  <p className="whitespace-pre-wrap text-sm text-zinc-700 dark:text-zinc-300">{comment.content}</p>
-                </article>
-              ))
-            )}
-          </div>
-
-          <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-800 dark:bg-zinc-900/40">
-            <textarea
-              value={replyText}
-              onChange={(event) => setReplyText(event.target.value)}
-              placeholder="写下你的回复..."
-              className="mb-3 min-h-24 w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
-            />
-            {message && <p className="mb-3 text-sm text-red-600 dark:text-red-400">{message}</p>}
-            <button
-              type="button"
-              onClick={handleReply}
-              disabled={isSubmitting}
-              className="rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-500 disabled:cursor-wait disabled:opacity-60"
-            >
-              {isSubmitting ? "发送中..." : "发送回复"}
-            </button>
-          </div>
-        </div>
-      </section>
-    </div>
-  );
+  return <div className="min-h-screen bg-white text-zinc-900 dark:bg-[#0a0e14] dark:text-zinc-100"><header className="flex flex-wrap items-center gap-4 border-b border-zinc-200 px-5 py-4 sm:gap-6 sm:px-8 dark:border-zinc-800"><Link href="/" className="text-2xl font-bold text-blue-500 dark:text-blue-400">SkillHub</Link><nav className="ml-auto flex flex-wrap items-center gap-4 text-sm text-zinc-600 dark:text-zinc-300"><Link href="/skills">Skills</Link><Link href="/agents">Agents</Link><Link href="/forum">论坛</Link><CreateMenu /><ThemeToggle /><AuthControls /></nav></header><section className="mx-auto max-w-4xl px-5 py-8 sm:px-8 sm:py-10"><Link href="/forum" className="mb-6 inline-block text-blue-600 hover:underline dark:text-blue-400">← 返回论坛</Link><article className="rounded-lg border border-zinc-200 bg-zinc-50 p-5 dark:border-zinc-800 dark:bg-zinc-900/40"><div className="mb-4"><span className="rounded-md bg-zinc-700 px-3 py-1 text-xs text-zinc-100">{categoryLabel(post.category) || "综合讨论"}</span></div>{editingPost ? <div className="space-y-3"><label className="block text-sm font-medium" htmlFor="edit-title">标题</label><input id="edit-title" value={editTitle} maxLength={120} onChange={(event) => setEditTitle(event.target.value)} className="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 dark:border-zinc-700 dark:bg-zinc-950" /><label className="block text-sm font-medium" htmlFor="edit-content">正文</label><textarea id="edit-content" value={editContent} maxLength={20000} onChange={(event) => setEditContent(event.target.value)} className="min-h-64 w-full rounded-md border border-zinc-300 bg-white px-3 py-2 font-mono dark:border-zinc-700 dark:bg-zinc-950" /><div className="flex gap-2"><button type="button" onClick={() => void savePost()} className="rounded-md bg-green-600 px-4 py-2 text-sm text-white">保存</button><button type="button" onClick={() => setEditingPost(false)} className="rounded-md border border-zinc-300 px-4 py-2 text-sm dark:border-zinc-700">取消</button></div></div> : <><div className="mb-4 flex items-start justify-between gap-3"><h1 className="text-2xl font-bold">{post.title}</h1>{user?.id === post.user_id && <div className="flex gap-2"><button type="button" onClick={() => setEditingPost(true)} className="rounded-md border border-zinc-300 px-3 py-1 text-sm dark:border-zinc-700">编辑</button><button type="button" onClick={() => void deletePost()} className="rounded-md border border-red-300 px-3 py-1 text-sm text-red-600">删除</button></div>}</div><div className="mb-6 flex flex-wrap items-center gap-2 text-sm"><span className="rounded-md bg-blue-600 px-2 py-1 text-xs font-medium text-white">作者</span><span className="text-zinc-600 dark:text-zinc-400">{post.author || "社区用户"}</span>{post.created_at && <><span className="text-zinc-500">·</span><span className="text-zinc-500">{new Date(post.created_at).toLocaleString("zh-CN")}</span></>}{post.updated_at && post.updated_at !== post.created_at && <span className="text-zinc-500">· 已编辑</span>}</div><SafeMarkdown content={post.content || "这个帖子还没有正文。"} className="mb-6 text-zinc-700 dark:text-zinc-300" /></>}<div className="flex flex-wrap items-center gap-6 border-t border-zinc-200 pt-4 text-sm dark:border-zinc-700"><button type="button" disabled={voteBusy} onClick={() => void changeVote("up")} className={`flex items-center gap-1 disabled:opacity-50 ${myVote === "up" ? "font-semibold text-green-600" : "hover:text-green-600"}`}>👍 <span>{upvotes}</span></button><button type="button" disabled={voteBusy} onClick={() => void changeVote("down")} className={`flex items-center gap-1 disabled:opacity-50 ${myVote === "down" ? "font-semibold text-red-600" : "hover:text-red-600"}`}>👎 <span>{downvotes}</span></button><span className="text-zinc-500">💬 {comments.length} 回复</span></div></article>{related.length > 0 && <div className="mt-8"><h2 className="mb-4 text-xl font-bold">相关推荐</h2><div className="space-y-2">{related.map((item) => <Link key={item.id} href={`/forum/${item.id}`} className="block rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-3 dark:border-zinc-800 dark:bg-zinc-900/40"><p className="truncate font-medium">{item.title}</p><p className="mt-0.5 text-xs text-zinc-500">{categoryLabel(item.category) || "综合讨论"} · {item.author || "社区用户"}</p></Link>)}</div></div>}<div className="mt-8"><h2 className="mb-4 text-xl font-bold">回复 ({comments.length})</h2><div className="mb-6 space-y-4">{comments.length === 0 ? <div className="border-y border-zinc-200 py-6 text-sm text-zinc-500 dark:border-zinc-800">还没有回复。</div> : comments.map((comment) => <article key={comment.id} className="rounded-lg border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-800 dark:bg-zinc-900/40"><div className="mb-2 flex flex-wrap items-center gap-2"><span className="rounded-md bg-blue-600 px-2 py-0.5 text-xs text-white">{comment.user_id === user?.id ? "我" : "回复者"}</span><span className="text-sm font-medium">{comment.user_id === user?.id ? currentProfile?.name : comment.author || "社区用户"}</span><span className="text-xs text-zinc-500">· {new Date(comment.created_at).toLocaleString("zh-CN")}</span>{comment.user_id === user?.id && <><button type="button" onClick={() => { setEditingComment(comment.id); setEditCommentText(comment.content); }} className="ml-auto text-xs text-blue-600">编辑</button><button type="button" onClick={() => void deleteComment(comment)} className="text-xs text-red-600">删除</button></>}</div>{editingComment === comment.id ? <div><textarea value={editCommentText} maxLength={5000} onChange={(event) => setEditCommentText(event.target.value)} className="min-h-24 w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-950" /><div className="mt-2 flex gap-2"><button type="button" onClick={() => void saveComment(comment)} className="rounded-md bg-green-600 px-3 py-1.5 text-sm text-white">保存</button><button type="button" onClick={() => setEditingComment(null)} className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm dark:border-zinc-700">取消</button></div></div> : <SafeMarkdown content={comment.content} className="text-sm text-zinc-700 dark:text-zinc-300" />}</article>)}</div><div className="rounded-lg border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-800 dark:bg-zinc-900/40"><label htmlFor="reply-body" className="mb-2 block text-sm font-medium">写回复 <span className="font-normal text-zinc-500">（最多 5,000 字）</span></label><textarea id="reply-body" value={replyText} maxLength={5000} onChange={(event) => setReplyText(event.target.value)} placeholder="支持安全 Markdown。" className="mb-3 min-h-24 w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-950" />{message && <p role="alert" className="mb-3 text-sm text-red-600 dark:text-red-400">{message}</p>}<button type="button" onClick={() => void handleReply()} disabled={isSubmitting} className="rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-60">{isSubmitting ? "发送中..." : "发送回复"}</button></div></div></section></div>;
 }
