@@ -22,13 +22,13 @@
 - 只读核验发现 `user_roles`、`knowledge_entries`、`notifications` 表存在，`moderate_post` 函数存在。
 - 执行后数据量快照：posts=5、comments=2、post_votes=2、comment_votes=0、user_roles=0、knowledge_entries=0。
 - RLS 策略数量：comments=5、content_reports=3、knowledge_entries=3、notifications=2、posts=5、user_roles=2。
-- 已提交私有 schema 快照动作；由于 Supabase 页面在动作后响应超时，快照结果未独立读取确认，不能把它标记为已验证备份。
+- 私有 schema 快照已执行成功，Supabase 显示 “Success. No rows returned”，并启用 RLS；表名为 `private.skillhub_batch2_20260918_posts`、`_comments`、`_votes`、`_comment_votes`，未授权给 `public/anon/authenticated`。
 
 ## 当前阻塞
 
 1. 没有用户明确指定的管理员/运营账号，不能自动给未知账号授予角色；因此 BT01/BT02、后台真实操作和完整链路无法判通过。
 3. 没有隔离 U1/U2/O/M、邮件捕获和性能夹具；BT03–BT27 的真实身份、RLS、并发、通知、统计和性能证据待补。
-4. 私有回滚快照的 UI 结果未完成独立确认；应用回滚 release 已保留，但数据库新增结构不做反向删除。
+4. 应用回滚 release 已保留；数据库新增结构不做反向删除，按兼容回滚策略处理。
 5. GitHub HTTPS 推送曾出现连接重置；本次通过授权 SCP 发布，未声称已推送 GitHub。
 
 ## 下一步

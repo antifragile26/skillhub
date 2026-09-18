@@ -11,7 +11,7 @@
 | `npm run build` | 通过 | Next.js 16.2.12，新增 6 个第二批路由进入构建 |
 | 本地路由冒烟 | 通过 | `/knowledge`、`/collections`、`/notifications`、`/admin`、`/forum`、`/forum/new` 均 HTTP 200；未写入数据库 |
 | SQL 迁移 | 通过（结构核验） | SQL Editor 已执行；`user_roles`、`knowledge_entries`、`notifications` 表和 `moderate_post` 函数存在 |
-| 迁移后数据保全 | 部分 | 迁移后读取到 posts=5、comments=2、post_votes=2、comment_votes=0；私有快照动作已提交但 UI 结果未独立确认 |
+| 迁移后数据保全 | 通过 | 迁移后读取到 posts=5、comments=2、post_votes=2、comment_votes=0；私有 schema 四张快照表执行成功，Supabase 显示 “Success. No rows returned”，并启用 RLS |
 | RLS 结构核验 | 通过（结构） | 目标表策略数量已读取；尚未用隔离账号做行为验收 |
 | 线上健康检查 | 通过 | `/api/health` 返回 ok=true、commit=`5954e937f3f89d6fd370d2903b4851fc7d223b16` |
 | 线上路由冒烟 | 通过 | `/forum`、`/forum/new`、`/knowledge`、`/collections`、`/notifications`、`/admin` 均 HTTP 200 |
