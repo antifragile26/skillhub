@@ -4,9 +4,9 @@
 
 ## 当前状态
 
-- 开发：核心数据库兼容层、论坛审核状态、案例/问答、知识库/专题、通知、产品关联和运营后台已实现，候选提交 `5954e937f3f89d6fd370d2903b4851fc7d223b16`。
+- 开发：核心数据库兼容层、论坛审核状态、案例/问答、知识库/专题、通知、产品关联、运营后台和自动审核 Agent v1 已实现，应用提交 `8775434`。
 - 测试：本地 lint、TypeScript、生产构建、线上路由和健康检查已通过；真实角色/RLS/并发/完整浏览器链路尚未通过。
-- 发布：候选已通过授权 SCP 发布到演示环境；线上健康检查报告提交 `5954e937f3f89d6fd370d2903b4851fc7d223b16`，PM2 online。
+- 发布：自动审核 Agent 已通过授权 SCP 发布到演示环境；线上健康检查报告提交 `8775434`，PM2 online。
 
 ## 已完成
 
@@ -23,6 +23,7 @@
 - 执行后数据量快照：posts=5、comments=2、post_votes=2、comment_votes=0、user_roles=0、knowledge_entries=0。
 - RLS 策略数量：comments=5、content_reports=3、knowledge_entries=3、notifications=2、posts=5、user_roles=2。
 - 私有 schema 快照已执行成功，Supabase 显示 “Success. No rows returned”，并启用 RLS；表名为 `private.skillhub_batch2_20260918_posts`、`_comments`、`_votes`、`_comment_votes`，未授权给 `public/anon/authenticated`。
+- 自动审核迁移 `20260918030000_automated_moderation_agent.sql` 已执行成功；核验到自动审核记录表、评分函数、人工队列函数和 2 个触发器存在。测试文本被判定为 `flagged`，风险分 100。
 
 ## 当前阻塞
 
@@ -30,6 +31,12 @@
 3. 没有隔离 U1/U2/O/M、邮件捕获和性能夹具；BT03–BT27 的真实身份、RLS、并发、通知、统计和性能证据待补。
 4. 应用回滚 release 已保留；数据库新增结构不做反向删除，按兼容回滚策略处理。
 5. GitHub HTTPS 推送曾出现连接重置；本次通过授权 SCP 发布，未声称已推送 GitHub。
+
+## 自动审核 Agent
+
+- 低风险帖子自动发布；高风险帖子保留在 `/admin` 待审核。
+- 高风险回复不公开展示，保留原记录并进入 `/admin/moderation` 队列。
+- Agent 只做规则初筛，不拥有管理员角色；运营人员仍负责最终通过/驳回。
 
 ## 下一步
 

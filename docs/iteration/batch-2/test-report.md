@@ -13,8 +13,9 @@
 | SQL 迁移 | 通过（结构核验） | SQL Editor 已执行；`user_roles`、`knowledge_entries`、`notifications` 表和 `moderate_post` 函数存在 |
 | 迁移后数据保全 | 通过 | 迁移后读取到 posts=5、comments=2、post_votes=2、comment_votes=0；私有 schema 四张快照表执行成功，Supabase 显示 “Success. No rows returned”，并启用 RLS |
 | RLS 结构核验 | 通过（结构） | 目标表策略数量已读取；尚未用隔离账号做行为验收 |
-| 线上健康检查 | 通过 | `/api/health` 返回 ok=true、commit=`5954e937f3f89d6fd370d2903b4851fc7d223b16` |
-| 线上路由冒烟 | 通过 | `/forum`、`/forum/new`、`/knowledge`、`/collections`、`/notifications`、`/admin` 均 HTTP 200 |
+| 自动审核 Agent 迁移 | 通过 | 自动审核记录表、评分函数、人工队列函数和 2 个触发器存在；高风险样本文本返回 flagged、风险分 100 |
+| 线上健康检查 | 通过 | `/api/health` 返回 ok=true、commit=`8775434` |
+| 线上路由冒烟 | 通过 | `/forum`、`/knowledge`、`/collections`、`/notifications`、`/admin`、`/admin/moderation` 均 HTTP 200 |
 | 真实角色/RLS | 阻塞 | `user_roles` 当前为 0；无隔离 O/M/U1/U2 账号 |
 | 浏览器完整链路 | 未执行 | 迁移和管理员初始化未满足 |
 
