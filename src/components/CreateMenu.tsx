@@ -10,7 +10,7 @@ export default function CreateMenu() {
     <div className="relative">
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-1 hover:text-zinc-900 dark:hover:text-white"
+        className="flex h-9 items-center gap-1 rounded-lg border border-slate-200 px-2.5 text-slate-600 transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 dark:border-slate-700 dark:text-slate-300 dark:hover:border-blue-500 dark:hover:bg-blue-950/40 dark:hover:text-blue-200"
         title="创建"
       >
         <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -25,7 +25,7 @@ export default function CreateMenu() {
         <>
           <div className="fixed inset-0 z-10" onClick={() => setIsOpen(false)} />
 
-          <div className="absolute right-0 z-20 mt-2 w-56 rounded-xl border border-zinc-300 bg-white py-2 shadow-2xl dark:border-zinc-700 dark:bg-[#18181b]">
+          <div className="absolute right-0 z-20 mt-2 w-56 rounded-xl border border-slate-200 bg-white py-2 shadow-xl shadow-slate-900/10 dark:border-slate-700 dark:bg-slate-800 dark:shadow-black/30">
             <Link
               href="/publish"
               className="flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-zinc-700 hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-800"

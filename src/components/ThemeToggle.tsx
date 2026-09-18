@@ -23,7 +23,7 @@ export default function ThemeToggle() {
   }
 
   return (
-    <button onClick={toggle} className="flex items-center hover:text-white" title={isDark ? "切换到日间模式" : "切换到夜间模式"}>
+    <button type="button" onClick={toggle} className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 dark:border-slate-700 dark:text-slate-300 dark:hover:border-blue-500 dark:hover:bg-blue-950/40 dark:hover:text-blue-200" title={isDark ? "切换到日间模式" : "切换到夜间模式"} aria-label={isDark ? "切换到日间模式" : "切换到夜间模式"}>
       {isDark ? (
         // 月亮图标（夜间模式）
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
