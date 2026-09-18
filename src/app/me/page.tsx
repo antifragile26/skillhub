@@ -8,6 +8,7 @@ import CreateMenu from "@/components/CreateMenu";
 import ThemeToggle from "@/components/ThemeToggle";
 import { getProfileDisplay } from "@/lib/profile";
 import { supabase } from "@/lib/supabase";
+import { statusLabels, type PostStatus } from "@/lib/batch2";
 
 type ContentItem = {
   id: string;
@@ -19,6 +20,8 @@ type ContentItem = {
   version?: string;
   created_at?: string;
   post_id?: string;
+  status?: PostStatus;
+  rejection_reason?: string | null;
 };
 
 type ContentGroups = {
@@ -64,8 +67,10 @@ function ContentSection({ title, items, href, action, kind }: {
                   </h3>
                   {kind === "agent" && item.framework && <span className="text-xs text-zinc-500">{item.framework}</span>}
                   {kind === "skill" && item.version && <span className="text-xs text-zinc-500">v{item.version}</span>}
+                  {kind === "post" && item.status && <span className="rounded bg-zinc-200 px-2 py-0.5 text-xs text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">{statusLabels[item.status]}</span>}
                 </div>
                 {(item.description || item.content) && <p className="mt-2 line-clamp-2 text-sm text-zinc-600 dark:text-zinc-400">{item.description || item.content}</p>}
+                {kind === "post" && item.rejection_reason && <p className="mt-2 text-xs text-red-600">驳回原因：{item.rejection_reason}</p>}
                 {item.created_at && <p className="mt-3 text-xs text-zinc-500">{new Date(item.created_at).toLocaleDateString("zh-CN")}</p>}
               </>
             );
@@ -105,7 +110,7 @@ export default function MyPage() {
       const [agents, skills, posts, comments] = await Promise.all([
         supabase.from("agents").select("id, name, framework, description, created_at").eq("user_id", data.user.id).order("created_at", { ascending: false }),
         supabase.from("skills").select("id, name, version, description, created_at").eq("user_id", data.user.id).order("created_at", { ascending: false }),
-        supabase.from("posts").select("id, title, content, created_at").eq("user_id", data.user.id).order("created_at", { ascending: false }),
+        supabase.from("posts").select("id, title, content, status, rejection_reason, created_at").eq("user_id", data.user.id).order("created_at", { ascending: false }),
         supabase.from("comments").select("id, content, created_at, post_id").eq("user_id", data.user.id).order("created_at", { ascending: false }),
       ]);
       const firstError = [agents.error, skills.error, posts.error, comments.error].find(Boolean);

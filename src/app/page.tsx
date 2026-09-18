@@ -29,6 +29,8 @@ export default async function Home() {
           <Link href="/skills" className="hover:text-zinc-900 dark:hover:text-white">Skills</Link>
           <Link href="/agents" className="hover:text-zinc-900 dark:hover:text-white">Agents</Link>
           <Link href="/forum" className="hover:text-zinc-900 dark:hover:text-white">论坛</Link>
+          <Link href="/knowledge" className="hover:text-zinc-900 dark:hover:text-white">知识库</Link>
+          <Link href="/collections" className="hover:text-zinc-900 dark:hover:text-white">专题</Link>
           <CreateMenu />
           <ThemeToggle />
           <AuthControls />

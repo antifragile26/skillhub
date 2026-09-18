@@ -11,6 +11,7 @@ export type ForumFieldErrors = {
   title?: string;
   content?: string;
   category?: string;
+  case?: string;
 };
 
 export function validatePostInput(title: string, content: string, category: string): ForumFieldErrors {
@@ -54,4 +55,3 @@ export function safeReturnPath(value: string | null | undefined, fallback = "/fo
 export function makeRequestId() {
   return crypto.randomUUID();
 }
-

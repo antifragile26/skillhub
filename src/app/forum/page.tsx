@@ -19,6 +19,7 @@ export default async function ForumPage({ searchParams }: { searchParams: Promis
   let query = supabase.from("posts").select("*", { count: "exact" }).is("deleted_at", null);
   if (queryText) query = query.or(`title.ilike.%${queryText}%,content.ilike.%${queryText}%`);
   if (category) query = query.eq("category", category);
+  query = query.order("pin_rank", { ascending: true, nullsFirst: false });
   query = sort === "hot" ? query.order("upvotes", { ascending: false }).order("replies", { ascending: false }).order("created_at", { ascending: false }).order("id", { ascending: false }) : query.order("created_at", { ascending: false }).order("id", { ascending: false });
   const from = (page - 1) * FORUM_PAGE_SIZE;
   const { data, count, error } = await query.range(from, from + FORUM_PAGE_SIZE - 1);
@@ -29,6 +30,7 @@ export default async function ForumPage({ searchParams }: { searchParams: Promis
     let fallback = supabase.from("posts").select("*", { count: "exact" });
     if (queryText) fallback = fallback.or(`title.ilike.%${queryText}%,content.ilike.%${queryText}%`);
     if (category) fallback = fallback.eq("category", category);
+    fallback = fallback.order("pin_rank", { ascending: true, nullsFirst: false });
     fallback = sort === "hot" ? fallback.order("upvotes", { ascending: false }).order("replies", { ascending: false }).order("created_at", { ascending: false }).order("id", { ascending: false }) : fallback.order("created_at", { ascending: false }).order("id", { ascending: false });
     const fallbackResult = await fallback.range(from, from + FORUM_PAGE_SIZE - 1);
     posts = fallbackResult.data ?? [];
