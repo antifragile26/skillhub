@@ -1,6 +1,6 @@
 # 第二批测试报告
 
-提交 SHA：第二批提交后补录。环境：Windows 本地工作区，Supabase 线上项目仅作配置核对。
+提交 SHA：`5954e937f3f89d6fd370d2903b4851fc7d223b16`。环境：Windows 本地工作区，Supabase 线上项目仅作配置核对。
 
 ## 已执行
 
@@ -9,6 +9,7 @@
 | `npm run lint` | 通过 | 本地命令退出码 0 |
 | `npx tsc --noEmit` | 通过 | 本地命令退出码 0 |
 | `npm run build` | 通过 | Next.js 16.2.12，新增 6 个第二批路由进入构建 |
+| 本地路由冒烟 | 通过 | `/knowledge`、`/collections`、`/notifications`、`/admin`、`/forum`、`/forum/new` 均 HTTP 200；未写入数据库 |
 | SQL 迁移 | 阻塞 | 已入仓，尚未在 Supabase SQL Editor 执行 |
 | 真实角色/RLS | 阻塞 | 无隔离 O/M/U1/U2 账号 |
 | 浏览器完整链路 | 未执行 | 迁移和管理员初始化未满足 |

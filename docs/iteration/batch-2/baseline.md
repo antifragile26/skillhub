@@ -2,7 +2,7 @@
 
 - 仓库：`C:/Users/1/Documents/ChatGPT/ai pm/skillhub`
 - 分支：`codex/p0-demo-alignment`
-- 当前本地候选：以第二批实现提交为准（未发布前不在此预填 SHA）
+- 当前本地候选：`5954e937f3f89d6fd370d2903b4851fc7d223b16`
 - 当前线上：`http://47.116.109.213/forum`
 - 线上已发布第一批：`4fd9e485d672c69b91f4e4ba46843c5f00134447`
 - Supabase 项目：`klkpnrkmfsvelghzplvw`
