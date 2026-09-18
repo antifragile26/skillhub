@@ -7,6 +7,7 @@ import { supabase } from "@/lib/supabase";
 import { getProfileDisplay } from "@/lib/profile";
 
 type AuthUser = {
+  id: string;
   email?: string | null;
   user_metadata?: {
     display_name?: string | null;
@@ -19,17 +20,27 @@ export default function AuthControls() {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
   const [isSwitching, setIsSwitching] = useState(false);
+  const [role, setRole] = useState<string>("member");
+
+  async function loadRole(nextUser: AuthUser | null) {
+    if (!nextUser) { setRole("member"); return; }
+    const result = await supabase.rpc("current_user_role");
+    setRole(result.error ? "member" : String(result.data ?? "member"));
+  }
 
   useEffect(() => {
     async function loadUser() {
       const { data } = await supabase.auth.getUser();
       setUser(data.user as AuthUser | null);
+      await loadRole(data.user as AuthUser | null);
       setIsLoaded(true);
     }
 
     void loadUser();
     const { data: subscription } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user as AuthUser | null);
+      const nextUser = session?.user as AuthUser | null;
+      setUser(nextUser);
+      void loadRole(nextUser);
       setIsLoaded(true);
     });
 
@@ -64,6 +75,7 @@ export default function AuthControls() {
   }
 
   const profile = getProfileDisplay(user);
+  const isStaff = role === "operator" || role === "admin";
 
   return (
     <>
@@ -77,6 +89,15 @@ export default function AuthControls() {
         </span>
         <span>我的</span>
       </Link>
+      {isStaff && (
+        <Link
+          href="/admin"
+          className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700 transition hover:border-blue-300 hover:bg-blue-100 dark:border-blue-900/70 dark:bg-blue-950/40 dark:text-blue-200 dark:hover:bg-blue-950/70"
+          title={role === "admin" ? "管理员后台" : "运营后台"}
+        >
+          {role === "admin" ? "管理员后台" : "运营后台"}
+        </Link>
+      )}
       <button
         type="button"
         onClick={switchAccount}
