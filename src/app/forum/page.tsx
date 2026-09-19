@@ -1,5 +1,4 @@
 import { supabase } from "@/lib/supabase";
-import ForumHeader from "@/components/ForumHeader";
 import ForumBrowser from "@/components/ForumBrowser";
 import Link from "next/link";
 import { FORUM_PAGE_SIZE } from "@/lib/forumValidation";
@@ -44,7 +43,6 @@ export default async function ForumPage({ searchParams }: { searchParams: Promis
   const returnTo = `/forum${params.q || params.category || params.sort || params.page ? `?${new URLSearchParams(params as Record<string, string>).toString()}` : ""}`;
 
   return <div className="min-h-screen bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
-    <ForumHeader />
     <section className="mx-auto max-w-5xl px-5 py-8 sm:px-8 sm:py-10"><div className="mb-6 flex items-center justify-between gap-4"><div><h1 className="text-3xl font-bold">论坛</h1><p className="mt-2 text-sm text-zinc-500">讨论、提问与经验分享</p></div><Link href={`/forum/new?returnTo=${encodeURIComponent(returnTo)}`} className="rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-500">发帖</Link></div>{loadError && <div className="mb-5 rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200">论坛数据加载异常，请稍后重试。</div>}<ForumBrowser posts={postsWithReplies} total={total} page={page} pageCount={pageCount} /></section>
   </div>;
 }

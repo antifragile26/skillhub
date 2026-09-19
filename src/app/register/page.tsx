@@ -3,7 +3,6 @@
 import { FormEvent, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
-import ThemeToggle from "@/components/ThemeToggle";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -41,11 +40,6 @@ export default function RegisterPage() {
 
   return (
     <div className="min-h-screen bg-white dark:bg-[#0a0e14] text-zinc-900 dark:text-zinc-100 flex items-center justify-center px-4">
-      {/* 右上角主题切换 */}
-      <div className="fixed top-4 right-4">
-        <ThemeToggle />
-      </div>
-
       <form onSubmit={handleRegister} className="w-full max-w-md rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/40 p-8">
         <h1 className="text-2xl font-bold text-center mb-6">注册 SkillHub</h1>
 

@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import ForumHeader from "@/components/ForumHeader";
 import { contentTypeLabels, getSupabaseErrorMessage, statusLabels } from "@/lib/batch2";
 import { automatedReviewLabel, automatedReviewSummary } from "@/lib/moderation";
 import { supabase } from "@/lib/supabase";
@@ -162,13 +161,13 @@ export default function AdminPage() {
     await runAction("role", () => supabase.from("user_roles").upsert({ user_id: roleUserId.trim(), role: roleValue, muted_until: muteUntil ? new Date(muteUntil).toISOString() : null }), "角色 / 禁言状态已保存。", false);
   }
 
-  if (role === null) return <div className="min-h-screen bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100"><ForumHeader /><main className="mx-auto grid min-h-[55vh] max-w-6xl place-items-center px-5"><p className={`${panelClass} px-6 py-5 text-sm text-slate-600 dark:text-slate-300`}>正在检查后台权限…</p></main></div>;
+  if (role === null) return <div className="min-h-screen bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100"><main className="mx-auto grid min-h-[55vh] max-w-6xl place-items-center px-5"><p className={`${panelClass} px-6 py-5 text-sm text-slate-600 dark:text-slate-300`}>正在检查后台权限…</p></main></div>;
   const filteredPosts = posts.filter((post) => (statusFilter === "all" || post.status === statusFilter) && (contentTypeFilter === "all" || post.content_type === contentTypeFilter) && (!authorFilter.trim() || post.author.toLowerCase().includes(authorFilter.trim().toLowerCase())));
   const pageCount = Math.max(1, Math.ceil(filteredPosts.length / 20));
   const visiblePosts = filteredPosts.slice((page - 1) * 20, page * 20);
   const pendingPosts = visiblePosts.filter((post) => post.status === "pending");
   const publishedPosts = visiblePosts.filter((post) => post.status === "published");
-  if (!["operator", "admin"].includes(role)) return <div className="min-h-screen bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100"><ForumHeader /><main className="mx-auto grid min-h-[55vh] max-w-6xl place-items-center px-5"><section className={`${panelClass} w-full max-w-xl p-8`}><h1 className="text-2xl font-bold">没有后台权限</h1><p className="mt-3 text-sm leading-6 text-slate-600 dark:text-slate-400">当前账号角色为成员。请由管理员在安全后台分配运营角色。</p><Link href="/forum" className={`${primaryButtonClass} mt-6`}>← 返回论坛</Link></section></main></div>;
+  if (!["operator", "admin"].includes(role)) return <div className="min-h-screen bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100"><main className="mx-auto grid min-h-[55vh] max-w-6xl place-items-center px-5"><section className={`${panelClass} w-full max-w-xl p-8`}><h1 className="text-2xl font-bold">没有后台权限</h1><p className="mt-3 text-sm leading-6 text-slate-600 dark:text-slate-400">当前账号角色为成员。请由管理员在安全后台分配运营角色。</p><Link href="/forum" className={`${primaryButtonClass} mt-6`}>← 返回论坛</Link></section></main></div>;
 
   const postActionBusy = (postId: number) => busy === `post-${postId}`;
   const feedbackStyles = feedback?.type === "success"
@@ -178,7 +177,6 @@ export default function AdminPage() {
       : "border-blue-200 bg-blue-50 text-blue-900 dark:border-blue-900 dark:bg-blue-950/80 dark:text-blue-100";
 
   return <div className="min-h-screen bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
-    <ForumHeader />
     <main className="mx-auto max-w-6xl px-5 py-8 sm:px-8">
       <header className="mb-7 flex flex-wrap items-end justify-between gap-4">
         <div>

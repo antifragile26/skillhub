@@ -12,6 +12,7 @@ export default function ForumHeader() {
         <Link href="/agents" className="rounded-lg px-3 py-2 transition hover:bg-slate-100 hover:text-slate-950 dark:hover:bg-slate-800 dark:hover:text-white">Agents</Link>
         <Link href="/forum" className="rounded-lg px-3 py-2 transition hover:bg-blue-50 hover:text-blue-700 dark:hover:bg-blue-950/40 dark:hover:text-blue-300">论坛</Link>
         <Link href="/knowledge" className="rounded-lg px-3 py-2 transition hover:bg-slate-100 hover:text-slate-950 dark:hover:bg-slate-800 dark:hover:text-white">知识库</Link>
+        <Link href="/collections" className="rounded-lg px-3 py-2 transition hover:bg-slate-100 hover:text-slate-950 dark:hover:bg-slate-800 dark:hover:text-white">专题</Link>
         <Link href="/notifications" className="rounded-lg px-3 py-2 transition hover:bg-slate-100 hover:text-slate-950 dark:hover:bg-slate-800 dark:hover:text-white">通知</Link>
         <CreateMenu />
         <ThemeToggle />

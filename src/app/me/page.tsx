@@ -3,9 +3,6 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import AuthControls from "@/components/AuthControls";
-import CreateMenu from "@/components/CreateMenu";
-import ThemeToggle from "@/components/ThemeToggle";
 import { getProfileDisplay } from "@/lib/profile";
 import { supabase } from "@/lib/supabase";
 import { statusLabels, type PostStatus } from "@/lib/batch2";
@@ -135,18 +132,6 @@ export default function MyPage() {
 
   return (
     <div className="min-h-screen bg-white text-zinc-900 dark:bg-[#0a0e14] dark:text-zinc-100">
-      <header className="flex flex-wrap items-center gap-5 border-b border-zinc-200 px-5 py-4 sm:px-8 dark:border-zinc-800">
-        <Link href="/" className="text-2xl font-bold text-blue-500 dark:text-blue-400">SkillHub</Link>
-        <nav className="ml-auto flex flex-wrap items-center gap-4 text-sm text-zinc-600 dark:text-zinc-300">
-          <Link href="/skills" className="hover:text-zinc-900 dark:hover:text-white">Skills</Link>
-          <Link href="/agents" className="hover:text-zinc-900 dark:hover:text-white">Agents</Link>
-          <Link href="/forum" className="hover:text-zinc-900 dark:hover:text-white">论坛</Link>
-          <CreateMenu />
-          <ThemeToggle />
-          <AuthControls />
-        </nav>
-      </header>
-
       <main className="mx-auto max-w-6xl px-5 py-10 sm:px-8">
         <section className="border-b border-zinc-200 pb-8 dark:border-zinc-800">
           <div className="flex flex-wrap items-center gap-5">

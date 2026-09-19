@@ -2,9 +2,6 @@
 
 // 从我们刚写的连接文件里，拿到访问数据库的通道
 import { supabase } from "@/lib/supabase";
-import CreateMenu from "@/components/CreateMenu";
-import ThemeToggle from "@/components/ThemeToggle";
-import AuthControls from "@/components/AuthControls";
 import Link from "next/link";
 
 // 注意这里多了 async —— 意思是"这个页面需要等数据库回话"
@@ -19,23 +16,6 @@ export default async function Home() {
   return (
     // 整个页面：深色背景（接近黑），文字浅色
     <div className="min-h-screen bg-white dark:bg-[#0a0e14] text-zinc-900 dark:text-zinc-100">
-
-      {/* ===== 顶部导航栏 ===== */}
-      <header className="flex items-center gap-6 px-8 py-4 border-b border-zinc-200 dark:border-zinc-800">
-        {/* 左边：蓝色 Logo */}
-        <div className="text-2xl font-bold text-blue-500 dark:text-blue-400">SkillHub</div>
-        {/* 右边：导航链接 + 按钮（靠右对齐） */}
-        <nav className="ml-auto flex items-center gap-5 text-sm text-zinc-600 dark:text-zinc-300">
-          <Link href="/skills" className="hover:text-zinc-900 dark:hover:text-white">Skills</Link>
-          <Link href="/agents" className="hover:text-zinc-900 dark:hover:text-white">Agents</Link>
-          <Link href="/forum" className="hover:text-zinc-900 dark:hover:text-white">论坛</Link>
-          <Link href="/knowledge" className="hover:text-zinc-900 dark:hover:text-white">知识库</Link>
-          <Link href="/collections" className="hover:text-zinc-900 dark:hover:text-white">专题</Link>
-          <CreateMenu />
-          <ThemeToggle />
-          <AuthControls />
-        </nav>
-      </header>
 
       {/* ===== 中间的大标题区 ===== */}
       <section className="flex flex-col items-center text-center py-20 px-4">
