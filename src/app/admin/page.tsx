@@ -6,9 +6,9 @@ import { contentTypeLabels, getSupabaseErrorMessage, statusLabels } from "@/lib/
 import { automatedReviewLabel, automatedReviewSummary } from "@/lib/moderation";
 import { supabase } from "@/lib/supabase";
 
-type PendingPost = { id: number; title: string; content: string; author: string; status: string; content_type: string; created_at: string; rejection_reason?: string | null; automated_review_status?: "not_run" | "clean" | "flagged"; automated_risk_score?: number; automated_labels?: string[] };
+type PendingPost = { id: number; title: string; content: string; author: string; status: string; content_type: string; created_at: string; is_featured?: boolean; pin_rank?: number | null; rejection_reason?: string | null; automated_review_status?: "not_run" | "clean" | "flagged"; automated_risk_score?: number; automated_labels?: string[] };
 type Report = { id: string; target_type: string; target_id: string; reason: string; status: string; created_at: string };
-type Knowledge = { id: string; title: string; status: string; source_post_id?: number | null; summary: string; steps: string; conclusions: string; limitations: string; tags: string[] };
+type Knowledge = { id: string; title: string; status: string; source_post_id?: number | null; summary: string; scenario: string; steps: string; conclusions: string; limitations: string; tags: string[] };
 type Collection = { id: string; name: string; description: string; status: string };
 type Stats = Record<string, number>;
 type Feedback = { type: "success" | "error" | "info"; text: string };
@@ -25,6 +25,8 @@ export default function AdminPage() {
   const [posts, setPosts] = useState<PendingPost[]>([]);
   const [reports, setReports] = useState<Report[]>([]);
   const [knowledge, setKnowledge] = useState<Knowledge[]>([]);
+  const [editingKnowledgeId, setEditingKnowledgeId] = useState<string | null>(null);
+  const [knowledgeEditOriginal, setKnowledgeEditOriginal] = useState<Knowledge | null>(null);
   const [collections, setCollections] = useState<Collection[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
   const [feedback, setFeedback] = useState<Feedback | null>(null);
@@ -43,9 +45,9 @@ export default function AdminPage() {
     setRole((roleResult.data as string | null) ?? "member");
     if (roleResult.error || !["operator", "admin"].includes(String(roleResult.data))) return;
     const [postResult, reportResult, knowledgeResult, collectionsResult] = await Promise.all([
-      supabase.from("posts").select("id,title,content,author,status,content_type,created_at,rejection_reason,automated_review_status,automated_risk_score,automated_labels").in("status", ["pending", "published", "unpublished"]).order("created_at", { ascending: true }).limit(50),
+      supabase.from("posts").select("id,title,content,author,status,content_type,created_at,is_featured,pin_rank,rejection_reason,automated_review_status,automated_risk_score,automated_labels").in("status", ["pending", "published", "unpublished"]).order("created_at", { ascending: true }).limit(50),
       supabase.from("content_reports").select("id,target_type,target_id,reason,status,created_at").eq("status", "open").order("created_at", { ascending: true }).limit(50),
-      supabase.from("knowledge_entries").select("id,title,status,source_post_id,summary,steps,conclusions,limitations,tags").in("status", ["draft", "published"]).order("updated_at", { ascending: false }).limit(50),
+      supabase.from("knowledge_entries").select("id,title,status,source_post_id,summary,scenario,steps,conclusions,limitations,tags").in("status", ["draft", "published"]).order("updated_at", { ascending: false }).limit(50),
       supabase.from("knowledge_collections").select("id,name,description,status").order("updated_at", { ascending: false }).limit(50),
     ]);
     setPosts((postResult.data ?? []) as PendingPost[]); setReports((reportResult.data ?? []) as Report[]); setKnowledge((knowledgeResult.data ?? []) as Knowledge[]); setCollections((collectionsResult.data ?? []) as Collection[]);
@@ -57,18 +59,20 @@ export default function AdminPage() {
     return getSupabaseErrorMessage(message);
   }
 
-  async function runAction<T extends ActionResult>(key: string, request: () => PromiseLike<T>, successText: string, refresh = true) {
+  async function runAction<T extends ActionResult>(key: string, request: () => PromiseLike<T>, successText: string, refresh = true): Promise<boolean> {
     setBusy(key);
     try {
       const result = await request();
       if (result.error) {
         setFeedback({ type: "error", text: errorMessage(result.error) });
-        return;
+        return false;
       }
       setFeedback({ type: "success", text: successText });
       if (refresh) void load();
+      return true;
     } catch (error) {
       setFeedback({ type: "error", text: errorMessage(error) });
+      return false;
     } finally {
       setBusy(null);
     }
@@ -83,8 +87,10 @@ export default function AdminPage() {
     const successText = decision === "approve" ? "帖子已通过并发布。" : decision === "reject" ? "帖子已驳回。" : decision === "unpublish" ? "帖子已下架。" : "帖子状态已更新。";
     await runAction(`post-${post.id}`, () => supabase.rpc("moderate_post", { p_post_id: post.id, p_decision: decision, p_reason: reason }), successText);
   }
-  async function feature(post: PendingPost, featured: boolean, pinRank: number | null) {
-    const successText = pinRank !== null ? `帖子已置顶到第 ${pinRank} 位。` : featured ? "帖子已标记为精选。" : "精选状态已取消。";
+  async function feature(post: PendingPost, featured: boolean, pinRank: number | null, changed: "featured" | "pin") {
+    const successText = changed === "featured"
+      ? featured ? "帖子已标记为精选。" : "精选状态已取消。"
+      : pinRank !== null ? `帖子已置顶到第 ${pinRank} 位。` : "帖子已取消置顶。";
     await runAction(`feature-${post.id}`, () => supabase.rpc("set_post_feature_flags", { p_post_id: post.id, p_featured: featured, p_pin_rank: pinRank }), successText);
   }
   async function resolve(report: Report, resultValue: string) {
@@ -125,7 +131,22 @@ export default function AdminPage() {
     await runAction(`publish-${item.id}`, () => supabase.rpc("publish_knowledge", { p_knowledge_id: item.id }), "知识条目已发布。");
   }
   async function saveKnowledge(item: Knowledge) {
-    await runAction(`save-knowledge-${item.id}`, () => supabase.from("knowledge_entries").update({ title: item.title, summary: item.summary, steps: item.steps, conclusions: item.conclusions, limitations: item.limitations, tags: item.tags }).eq("id", item.id), "知识草稿已保存。");
+    const saved = await runAction(`save-knowledge-${item.id}`, () => supabase.from("knowledge_entries").update({ title: item.title, summary: item.summary, scenario: item.scenario, steps: item.steps, conclusions: item.conclusions, limitations: item.limitations, tags: item.tags }).eq("id", item.id), item.status === "published" ? "知识条目已更新并保持发布。" : "知识草稿已保存。");
+    if (saved && item.status === "published") {
+      setEditingKnowledgeId(null);
+      setKnowledgeEditOriginal(null);
+    }
+  }
+  function startEditingKnowledge(item: Knowledge) {
+    setKnowledgeEditOriginal({ ...item, tags: [...item.tags] });
+    setEditingKnowledgeId(item.id);
+  }
+  function cancelEditingKnowledge(item: Knowledge) {
+    if (knowledgeEditOriginal?.id === item.id) {
+      setKnowledge((items) => items.map((value) => value.id === item.id ? knowledgeEditOriginal : value));
+    }
+    setEditingKnowledgeId(null);
+    setKnowledgeEditOriginal(null);
   }
   async function createCollection() {
     const name = window.prompt("专题名称（1-80字）");
@@ -239,9 +260,10 @@ export default function AdminPage() {
         <div className="mb-4 flex flex-wrap items-end justify-between gap-3"><div><h2 className="text-xl font-bold">已发布内容运营</h2><p className="mt-1 text-sm text-slate-500 dark:text-slate-400">精选、置顶、整理为知识，或在必要时将内容下架。</p></div><span className="text-sm text-slate-500">{publishedPosts.length} 条显示中</span></div>
         {publishedPosts.length === 0 ? <p className={`${panelClass} p-8 text-center text-sm text-slate-500`}>当前页没有已发布内容。</p> : <div className="grid gap-3 md:grid-cols-2">{publishedPosts.map((post) => <article key={post.id} className={`${panelClass} p-4`}>
           <div className="flex items-start justify-between gap-4"><div><p className="text-xs text-slate-500 dark:text-slate-400">{contentTypeLabels[post.content_type as keyof typeof contentTypeLabels] ?? post.content_type} · {post.author}</p><Link href={`/forum/${post.id}`} className="mt-2 block font-semibold hover:text-blue-600 dark:hover:text-blue-400">{post.title}</Link></div><span className="shrink-0 rounded bg-green-100 px-2 py-1 text-xs text-green-700 dark:bg-green-950/50 dark:text-green-200">已发布</span></div>
+          {(post.is_featured || post.pin_rank) && <div className="mt-3 flex flex-wrap gap-2">{post.is_featured && <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-800 dark:bg-amber-950/50 dark:text-amber-200">已精选</span>}{post.pin_rank && <span className="rounded-full bg-violet-100 px-2.5 py-1 text-xs font-medium text-violet-800 dark:bg-violet-950/50 dark:text-violet-200">已置顶 · 第 {post.pin_rank} 位</span>}</div>}
           <div className="mt-4 flex flex-wrap gap-2 border-t border-slate-200 pt-4 dark:border-slate-700">
-            <button type="button" disabled={busy !== null} onClick={() => void feature(post, true, null)} className={secondaryButtonClass}>{busy === `feature-${post.id}` ? "保存中…" : "标记精选"}</button>
-            <button type="button" disabled={busy !== null} onClick={() => void feature(post, true, 1)} className={secondaryButtonClass}>{busy === `feature-${post.id}` ? "保存中…" : "置顶第 1 位"}</button>
+            <button type="button" disabled={busy !== null} onClick={() => void feature(post, !post.is_featured, post.pin_rank ?? null, "featured")} className={secondaryButtonClass}>{busy === `feature-${post.id}` ? "保存中…" : post.is_featured ? "取消精选" : "设为精选"}</button>
+            <button type="button" disabled={busy !== null} onClick={() => void feature(post, post.is_featured ?? false, post.pin_rank ? null : 1, "pin")} className={secondaryButtonClass}>{busy === `feature-${post.id}` ? "保存中…" : post.pin_rank ? "取消置顶" : "置顶第 1 位"}</button>
             <button type="button" disabled={busy !== null} onClick={() => void createKnowledge(post)} className={secondaryButtonClass}>{busy === `knowledge-${post.id}` ? "创建中…" : "整理为知识"}</button>
             <button type="button" disabled={busy !== null} onClick={() => void moderate(post, "unpublish")} className={dangerButtonClass}>{postActionBusy(post.id) ? "处理中…" : "下架"}</button>
           </div>
@@ -256,10 +278,11 @@ export default function AdminPage() {
         </article>)}</div>
       </section>
 
-      <section className="mt-8"><div className="mb-4"><h2 className="text-xl font-bold">知识发布</h2><p className="mt-1 text-sm text-slate-500 dark:text-slate-400">编辑草稿内容，核对后再发布到知识库。</p></div>
+      <section className="mt-8"><div className="mb-4"><h2 className="text-xl font-bold">知识发布</h2><p className="mt-1 text-sm text-slate-500 dark:text-slate-400">编辑草稿或已发布内容；已发布条目的修改会即时生效。</p></div>
         <div className="space-y-3">{knowledge.length === 0 ? <p className={`${panelClass} p-8 text-center text-sm text-slate-500`}>暂无知识条目，可从已发布帖子中整理创建。</p> : knowledge.map((item) => <article key={item.id} className={`${panelClass} p-4 sm:p-5`}>
           <div className="flex flex-wrap items-center justify-between gap-3"><div><span className="text-xs text-slate-500">知识条目</span><Link href={`/knowledge/${item.id}`} className="mt-1 block font-semibold hover:text-blue-600 dark:hover:text-blue-400">{item.title}</Link></div><span className={`rounded px-2 py-1 text-xs ${item.status === "published" ? "bg-green-100 text-green-700 dark:bg-green-950/50 dark:text-green-200" : "bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-200"}`}>{item.status === "published" ? "已发布" : "草稿"}</span></div>
-          {item.status === "draft" && <div className="mt-4 grid gap-3 border-t border-slate-200 pt-4 dark:border-slate-700 md:grid-cols-2"><input value={item.title} onChange={(event) => setKnowledge((items) => items.map((value) => value.id === item.id ? { ...value, title: event.target.value } : value))} className={fieldClass} placeholder="标题" /><input value={item.summary} onChange={(event) => setKnowledge((items) => items.map((value) => value.id === item.id ? { ...value, summary: event.target.value } : value))} className={fieldClass} placeholder="摘要" /><textarea value={item.steps} onChange={(event) => setKnowledge((items) => items.map((value) => value.id === item.id ? { ...value, steps: event.target.value } : value))} className={`${fieldClass} min-h-28 resize-y`} placeholder="操作步骤" /><textarea value={item.conclusions} onChange={(event) => setKnowledge((items) => items.map((value) => value.id === item.id ? { ...value, conclusions: event.target.value } : value))} className={`${fieldClass} min-h-28 resize-y`} placeholder="结论 / 效果" /><textarea value={item.limitations} onChange={(event) => setKnowledge((items) => items.map((value) => value.id === item.id ? { ...value, limitations: event.target.value } : value))} className={`${fieldClass} min-h-24 resize-y md:col-span-2`} placeholder="限制条件" /><div className="flex flex-wrap gap-2 md:col-span-2"><button type="button" disabled={busy !== null} onClick={() => void saveKnowledge(item)} className={secondaryButtonClass}>{busy === `save-knowledge-${item.id}` ? "保存中…" : "保存草稿"}</button><button type="button" disabled={busy !== null} onClick={() => void publishKnowledge(item)} className={primaryButtonClass}>{busy === `publish-${item.id}` ? "发布中…" : "预览确认并发布"}</button></div></div>}
+          {item.status === "published" && editingKnowledgeId !== item.id && <button type="button" disabled={busy !== null} onClick={() => startEditingKnowledge(item)} className={`${secondaryButtonClass} mt-4`}>编辑知识</button>}
+          {(item.status === "draft" || editingKnowledgeId === item.id) && <div className="mt-4 grid gap-3 border-t border-slate-200 pt-4 dark:border-slate-700 md:grid-cols-2"><input aria-label="知识标题" value={item.title} onChange={(event) => setKnowledge((items) => items.map((value) => value.id === item.id ? { ...value, title: event.target.value } : value))} className={fieldClass} placeholder="标题" /><input aria-label="知识摘要" value={item.summary} onChange={(event) => setKnowledge((items) => items.map((value) => value.id === item.id ? { ...value, summary: event.target.value } : value))} className={fieldClass} placeholder="摘要" /><textarea aria-label="适用场景" value={item.scenario} onChange={(event) => setKnowledge((items) => items.map((value) => value.id === item.id ? { ...value, scenario: event.target.value } : value))} className={`${fieldClass} min-h-24 resize-y md:col-span-2`} placeholder="适用场景" /><textarea aria-label="操作步骤" value={item.steps} onChange={(event) => setKnowledge((items) => items.map((value) => value.id === item.id ? { ...value, steps: event.target.value } : value))} className={`${fieldClass} min-h-28 resize-y`} placeholder="操作步骤" /><textarea aria-label="结论与效果" value={item.conclusions} onChange={(event) => setKnowledge((items) => items.map((value) => value.id === item.id ? { ...value, conclusions: event.target.value } : value))} className={`${fieldClass} min-h-28 resize-y`} placeholder="结论 / 效果" /><textarea aria-label="限制条件" value={item.limitations} onChange={(event) => setKnowledge((items) => items.map((value) => value.id === item.id ? { ...value, limitations: event.target.value } : value))} className={`${fieldClass} min-h-24 resize-y md:col-span-2`} placeholder="限制条件" /><input aria-label="知识标签" value={item.tags.join(", ")} onChange={(event) => setKnowledge((items) => items.map((value) => value.id === item.id ? { ...value, tags: event.target.value.split(",").map((tag) => tag.trim()).filter(Boolean) } : value))} className={`${fieldClass} md:col-span-2`} placeholder="标签，用逗号分隔" /><div className="flex flex-wrap gap-2 md:col-span-2"><button type="button" disabled={busy !== null} onClick={() => void saveKnowledge(item)} className={item.status === "published" ? primaryButtonClass : secondaryButtonClass}>{busy === `save-knowledge-${item.id}` ? "保存中…" : item.status === "published" ? "保存修改" : "保存草稿"}</button>{item.status === "draft" ? <button type="button" disabled={busy !== null} onClick={() => void publishKnowledge(item)} className={primaryButtonClass}>{busy === `publish-${item.id}` ? "发布中…" : "预览确认并发布"}</button> : <button type="button" disabled={busy !== null} onClick={() => cancelEditingKnowledge(item)} className={secondaryButtonClass}>取消编辑</button>}</div></div>}
         </article>)}</div>
       </section>
 
