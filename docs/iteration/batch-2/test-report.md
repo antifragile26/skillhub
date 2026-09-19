@@ -2,7 +2,7 @@
 
 提交 SHA：`86af342eabcdbf007ac95f7071ba85ac672a4f3c`。环境：Windows 本地工作区、Supabase 项目 `klkpnrkmfsvelghzplvw`、阿里云演示环境。
 
-2026-09-19 补充：移除演示数据按钮并新增真实来源整理迁移后，本地 lint/TypeScript/build 通过。只读 Supabase REST 检查发现已发布帖子 5 条、`demo_batch2_` 前缀帖子 0 条。新迁移尚未执行，知识和通知的数据库写入因此未计为通过。
+2026-09-19 补充：提交 `eb8691e` 已移除演示数据按钮并统一知识/通知入口；线上 `/admin`、`/knowledge`、`/notifications` 均 HTTP 200，页面未再出现“生成演示数据”。只读 Supabase REST 检查发现已发布帖子 5 条、`demo_batch2_` 前缀帖子 0 条。本地 lint/TypeScript/build 通过。新迁移尚未执行，知识和通知的数据库写入因此未计为通过。
 
 ## 已执行
 

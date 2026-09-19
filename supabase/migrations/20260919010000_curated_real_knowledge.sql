@@ -66,3 +66,4 @@ end $$;
 
 -- 清理旧按钮可能调用的演示夹具函数；不会触碰任何数据行。
 drop function if exists public.seed_demo_batch2_examples();
+notify pgrst, 'reload schema';
