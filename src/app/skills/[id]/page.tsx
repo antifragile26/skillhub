@@ -33,7 +33,7 @@ export default function SkillDetailPage() {
   useEffect(() => {
     async function load() {
       const [skillResult, userResult] = await Promise.all([
-        supabase.from("skills").select("*").eq("id", id).single(),
+        supabase.from("skills").select("*").eq("id", id).is("deleted_at", null).single(),
         supabase.auth.getUser(),
       ]);
       setSkill(skillResult.data);

@@ -8,7 +8,7 @@ import { skillCategoryLabel } from "@/lib/skillCategories";
 import { supabase } from "@/lib/supabase";
 
 type PendingPost = { id: number; title: string; content: string; author: string; status: string; content_type: string; created_at: string; is_featured?: boolean; pin_rank?: number | null; rejection_reason?: string | null; automated_review_status?: "not_run" | "clean" | "flagged"; automated_risk_score?: number; automated_labels?: string[] };
-type SkillReview = { id: number; name: string; version: string | null; description: string | null; category: string | null; created_at: string; submitted_at: string | null; package_name: string | null; package_size: number | null; user_id: string | null };
+type SkillReview = { id: number; name: string; version: string | null; description: string | null; category: string | null; created_at: string; submitted_at: string | null; package_name: string | null; package_size: number | null; user_id: string | null; status?: string; deleted_at?: string | null };
 type Report = { id: string; target_type: string; target_id: string; reason: string; status: string; created_at: string };
 type Knowledge = { id: string; title: string; status: string; source_post_id?: number | null; summary: string; scenario: string; steps: string; conclusions: string; limitations: string; tags: string[] };
 type Collection = { id: string; name: string; description: string; status: string };
@@ -26,6 +26,7 @@ export default function AdminPage() {
   const [role, setRole] = useState<string | null>(null);
   const [posts, setPosts] = useState<PendingPost[]>([]);
   const [skillReviews, setSkillReviews] = useState<SkillReview[]>([]);
+  const [managedSkills, setManagedSkills] = useState<SkillReview[]>([]);
   const [skillReviewError, setSkillReviewError] = useState("");
   const [postCount, setPostCount] = useState(0);
   const [reports, setReports] = useState<Report[]>([]);
@@ -55,15 +56,17 @@ export default function AdminPage() {
     if (statusFilter !== "all") postQuery = postQuery.eq("status", statusFilter);
     if (contentTypeFilter !== "all") postQuery = postQuery.eq("content_type", contentTypeFilter);
     if (authorFilter.trim()) postQuery = postQuery.ilike("author", `%${authorFilter.trim().replace(/[%_]/g, "\\$&")}%`);
-    const [postResult, reportResult, knowledgeResult, collectionsResult, skillResult] = await Promise.all([
+    const [postResult, reportResult, knowledgeResult, collectionsResult, skillResult, managedSkillResult] = await Promise.all([
       postQuery,
       supabase.from("content_reports").select("id,target_type,target_id,reason,status,created_at").eq("status", "open").order("created_at", { ascending: true }).limit(50),
       supabase.from("knowledge_entries").select("id,title,status,source_post_id,summary,scenario,steps,conclusions,limitations,tags").in("status", ["draft", "published"]).order("updated_at", { ascending: false }).limit(50),
       supabase.from("knowledge_collections").select("id,name,description,status").order("updated_at", { ascending: false }).limit(50),
       supabase.from("skills").select("id,name,version,description,category,created_at,submitted_at,package_name,package_size,user_id").eq("status", "pending").order("submitted_at", { ascending: true }).limit(20),
+      supabase.from("skills").select("id,name,version,description,category,created_at,submitted_at,package_name,package_size,user_id,status,deleted_at").or("status.eq.published,deleted_at.not.is.null").order("updated_at", { ascending: false }).limit(100),
     ]);
     setPosts((postResult.data ?? []) as PendingPost[]); setPostCount(postResult.count ?? 0); setReports((reportResult.data ?? []) as Report[]); setKnowledge((knowledgeResult.data ?? []) as Knowledge[]); setCollections((collectionsResult.data ?? []) as Collection[]);
     setSkillReviews((skillResult.data ?? []) as SkillReview[]); setSkillReviewError(skillResult.error ? `Skill 审核队列加载失败：${skillResult.error.message}` : "");
+    setManagedSkills((managedSkillResult.data ?? []) as SkillReview[]);
     const now = new Date(); const from = new Date(now); from.setDate(now.getDate() - 7); const statResult = await supabase.rpc("get_forum_stats", { p_from: from.toISOString(), p_to: now.toISOString() }); if (!statResult.error) setStats((statResult.data ?? null) as Stats | null);
   }, [authorFilter, contentTypeFilter, page, statusFilter]);
 
@@ -100,10 +103,11 @@ export default function AdminPage() {
     const successText = decision === "approve" ? "帖子已通过并发布。" : decision === "reject" ? "帖子已驳回。" : decision === "unpublish" ? "帖子已下架。" : "帖子状态已更新。";
     await runAction(`post-${post.id}`, () => supabase.rpc("moderate_post", { p_post_id: post.id, p_decision: decision, p_reason: reason }), successText);
   }
-  async function moderateSkill(skill: SkillReview, decision: "approve" | "reject") {
-    const reason = decision === "reject" ? window.prompt("请填写驳回原因（会通知作者）：") ?? "" : "";
-    if (decision === "reject" && !reason.trim()) return;
-    const successText = decision === "approve" ? `Skill「${skill.name}」已通过并发布。` : `Skill「${skill.name}」已驳回。`;
+  async function moderateSkill(skill: SkillReview, decision: "approve" | "reject" | "delete" | "restore") {
+    if (decision === "delete" && !window.confirm(`将「${skill.name}」从公开 Skill 目录移除？关联讨论和文件会保留，之后可恢复。`)) return;
+    const reason = decision === "reject" || decision === "delete" ? window.prompt(decision === "reject" ? "请填写驳回原因（会通知作者）：" : "请填写移除原因：") ?? "" : "";
+    if ((decision === "reject" || decision === "delete") && !reason.trim()) return;
+    const successText = decision === "approve" ? `Skill「${skill.name}」已通过并发布。` : decision === "reject" ? `Skill「${skill.name}」已驳回。` : decision === "delete" ? `Skill「${skill.name}」已从公开目录移除，可恢复。` : `Skill「${skill.name}」已恢复展示。`;
     await runAction(`skill-${skill.id}`, () => supabase.rpc("moderate_skill", { p_skill_id: skill.id, p_decision: decision, p_reason: reason }), successText);
   }
   async function feature(post: PendingPost, featured: boolean, pinRank: number | null, changed: "featured" | "pin") {
@@ -128,6 +132,8 @@ export default function AdminPage() {
           ? await supabase.rpc("moderate_post", { p_post_id: Number(report.target_id), p_decision: "unpublish", p_reason: reason })
           : report.target_type === "comment"
             ? await supabase.rpc("moderate_comment", { p_comment_id: report.target_id, p_decision: "unpublish", p_reason: reason })
+            : report.target_type === "skill"
+              ? await supabase.rpc("moderate_skill", { p_skill_id: Number(report.target_id), p_decision: "delete", p_reason: reason })
             : null;
         if (moderationResult?.error) {
           setFeedback({ type: "error", text: `举报已记录，但内容下架失败：${errorMessage(moderationResult.error)}` });
@@ -304,6 +310,11 @@ export default function AdminPage() {
         </div>
       </section>
 
+      <section id="skill-management" className={`${panelClass} mt-8 overflow-hidden`}>
+        <div className="border-b border-slate-200 px-5 py-5 dark:border-slate-700 sm:px-6"><div className="flex flex-wrap items-center gap-2"><h2 className="text-xl font-bold">已发布 Skill 管理</h2><span className="rounded-md bg-slate-100 px-2 py-1 text-xs font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">{managedSkills.length} 条</span></div><p className="mt-2 text-sm text-slate-500 dark:text-slate-400">从公开目录移除会保留讨论、举报和文件；已移除的 Skill 可在此恢复。</p></div>
+        <div className="space-y-3 p-4 sm:p-6">{managedSkills.length === 0 ? <p className="rounded-lg border border-dashed border-slate-300 py-8 text-center text-sm text-slate-500 dark:border-slate-700">没有已发布或已移除的 Skill。</p> : managedSkills.map((skill) => <article key={skill.id} className="flex flex-col gap-4 rounded-lg border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-900/50 sm:flex-row sm:items-center sm:justify-between"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2">{skill.deleted_at ? <span className="font-mono font-semibold">{skill.name}</span> : <Link href={`/skills/${skill.id}`} className="font-mono font-semibold text-blue-700 hover:underline dark:text-blue-300">{skill.name}</Link>}<span className={`rounded px-2 py-0.5 text-xs ${skill.deleted_at ? "bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300" : "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"}`}>{skill.deleted_at ? "已移除，可恢复" : "公开展示中"}</span></div><p className="mt-1 text-sm text-slate-500">#{skill.id} · v{skill.version || "0.1.0"} · 更新于 {new Date(skill.created_at).toLocaleDateString("zh-CN")}</p></div><div className="flex shrink-0 gap-2">{skill.deleted_at ? <button type="button" disabled={busy !== null} onClick={() => void moderateSkill(skill, "restore")} className={secondaryButtonClass}>{busy === `skill-${skill.id}` ? "处理中…" : "恢复展示"}</button> : <button type="button" disabled={busy !== null} onClick={() => void moderateSkill(skill, "delete")} className={dangerButtonClass}>{busy === `skill-${skill.id}` ? "处理中…" : "删除 Skill"}</button>}</div></article>)}</div>
+      </section>
+
       <section className="mt-8">
         <div className="mb-4 flex flex-wrap items-end justify-between gap-3"><div><h2 className="text-xl font-bold">已发布内容运营</h2><p className="mt-1 text-sm text-slate-500 dark:text-slate-400">精选、置顶、整理为知识，或在必要时将内容下架。</p></div><span className="text-sm text-slate-500">{publishedPosts.length} 条显示中</span></div>
         {publishedPosts.length === 0 ? <p className={`${panelClass} p-8 text-center text-sm text-slate-500`}>当前页没有已发布内容。</p> : <div className="grid gap-3 md:grid-cols-2">{publishedPosts.map((post) => <article key={post.id} className={`${panelClass} p-4`}>
@@ -319,9 +330,9 @@ export default function AdminPage() {
       </section>
 
       <section className={`${panelClass} mt-8 overflow-hidden`}>
-        <div className="border-b border-slate-200 px-5 py-5 dark:border-slate-700 sm:px-6"><div className="flex flex-wrap items-center gap-2"><h2 className="text-xl font-bold">举报队列</h2><span className="rounded-md bg-red-100 px-2 py-1 text-xs font-medium text-red-700 dark:bg-red-950/50 dark:text-red-200">{reports.length} 条待处理</span></div><p className="mt-1 text-sm text-slate-500 dark:text-slate-400">确认违规后会自动下架对应帖子或评论。</p></div>
+        <div className="border-b border-slate-200 px-5 py-5 dark:border-slate-700 sm:px-6"><div className="flex flex-wrap items-center gap-2"><h2 className="text-xl font-bold">举报队列</h2><span className="rounded-md bg-red-100 px-2 py-1 text-xs font-medium text-red-700 dark:bg-red-950/50 dark:text-red-200">{reports.length} 条待处理</span></div><p className="mt-1 text-sm text-slate-500 dark:text-slate-400">确认违规后会自动下架对应帖子、评论或 Skill。</p></div>
         <div className="space-y-3 p-4 sm:p-6">{reports.length === 0 ? <p className="rounded-lg border border-dashed border-slate-300 py-8 text-center text-sm text-slate-500 dark:border-slate-700">暂无未处理举报。</p> : reports.map((report) => <article key={report.id} className="flex flex-col gap-4 rounded-lg border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-900/50 sm:flex-row sm:items-center sm:justify-between">
-          <div><p className="text-xs text-slate-500 dark:text-slate-400">{report.target_type === "post" ? "帖子举报" : "评论举报"} · #{report.target_id}</p><p className="mt-2 font-medium">{report.reason}</p><p className="mt-1 text-xs text-slate-500">提交于 {new Date(report.created_at).toLocaleString("zh-CN")}</p></div>
+          <div><p className="text-xs text-slate-500 dark:text-slate-400">{report.target_type === "post" ? "帖子举报" : report.target_type === "comment" ? "评论举报" : report.target_type === "skill" ? "Skill 举报" : "知识举报"} · {report.target_type === "skill" ? managedSkills.some((skill) => String(skill.id) === report.target_id && !!skill.deleted_at) ? `Skill #${report.target_id}（已移除）` : <Link className="text-blue-600 hover:underline dark:text-blue-400" href={`/skills/${report.target_id}`}>查看 Skill #{report.target_id}</Link> : `#${report.target_id}`}</p><p className="mt-2 font-medium">{report.reason}</p><p className="mt-1 text-xs text-slate-500">提交于 {new Date(report.created_at).toLocaleString("zh-CN")}</p></div>
           <div className="flex flex-wrap gap-2"><button type="button" disabled={busy !== null} onClick={() => void resolve(report, "violation")} className={dangerButtonClass}>{busy === `report-${report.id}` ? "处理中…" : "违规并下架"}</button><button type="button" disabled={busy !== null} onClick={() => void resolve(report, "no_violation")} className={secondaryButtonClass}>无违规</button><button type="button" disabled={busy !== null} onClick={() => void resolve(report, "merged")} className={secondaryButtonClass}>重复合并</button></div>
         </article>)}</div>
       </section>

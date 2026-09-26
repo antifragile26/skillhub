@@ -31,6 +31,10 @@ export default function SkillDetail({ skill }: { skill: Skill }) {
   const [shareUrl, setShareUrl] = useState("");
   const [shareMessage, setShareMessage] = useState("");
   const [showShareFallback, setShowShareFallback] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
+  const [reportReason, setReportReason] = useState("");
+  const [reportBusy, setReportBusy] = useState(false);
+  const [reportMessage, setReportMessage] = useState("");
   const shareInputRef = useRef<HTMLInputElement>(null);
   const repoUrl = skill.repo_url || extractFirstUrl(skill.description);
   const hasFile = !!skill.file_path;
@@ -80,6 +84,36 @@ export default function SkillDetail({ skill }: { skill: Skill }) {
       // Keep the text selected so the user can copy it with the keyboard.
     }
     setShareMessage("链接已选中，请按 Ctrl+C 复制。");
+  }
+
+  async function submitReport(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const reason = reportReason.trim();
+    if (reason.length < 2 || reason.length > 2000) {
+      setReportMessage("请填写 2–2000 字的举报原因。");
+      return;
+    }
+    setReportBusy(true);
+    setReportMessage("");
+    const { data: auth } = await supabase.auth.getUser();
+    if (!auth.user) {
+      window.location.assign(`/login?returnTo=${encodeURIComponent(window.location.pathname)}`);
+      return;
+    }
+    const { error } = await supabase.from("content_reports").insert({
+      reporter_id: auth.user.id,
+      target_type: "skill",
+      target_id: String(skill.id),
+      reason,
+    });
+    setReportBusy(false);
+    if (error) {
+      setReportMessage(error.code === "23505" ? "你已经提交过这条 Skill 的待处理举报。" : `提交失败：${error.message}`);
+      return;
+    }
+    setReportMessage("举报已提交，管理员会尽快核查。");
+    setReportReason("");
+    setReportOpen(false);
   }
 
   return (
@@ -137,6 +171,13 @@ export default function SkillDetail({ skill }: { skill: Skill }) {
           </button>
         )}
         <button type="button" onClick={shareSkill} className="hub-button-secondary w-full">分享此 Skill</button>
+        <button type="button" onClick={() => { setReportOpen((open) => !open); setReportMessage(""); }} className="w-full rounded-md border border-zinc-300 px-4 py-2.5 text-sm font-medium text-zinc-600 transition hover:border-rose-300 hover:text-rose-700 dark:border-zinc-700 dark:text-zinc-300 dark:hover:border-rose-800 dark:hover:text-rose-300">举报此 Skill</button>
+        {reportOpen && <form onSubmit={(event) => void submitReport(event)} className="space-y-3 rounded-lg border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-700 dark:bg-zinc-900/60">
+          <label htmlFor="skill-report-reason" className="block text-sm font-medium">举报原因</label>
+          <textarea id="skill-report-reason" required minLength={2} maxLength={2000} value={reportReason} onChange={(event) => setReportReason(event.target.value)} placeholder="请描述你发现的问题，便于管理员核实。" className="min-h-28 w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500 dark:border-zinc-700 dark:bg-zinc-950" />
+          <div className="flex justify-end gap-2"><button type="button" onClick={() => setReportOpen(false)} className="rounded-md px-3 py-2 text-sm text-zinc-600 hover:bg-zinc-200 dark:text-zinc-300 dark:hover:bg-zinc-800">取消</button><button type="submit" disabled={reportBusy} className="rounded-md bg-rose-600 px-3 py-2 text-sm font-medium text-white hover:bg-rose-500 disabled:opacity-60">{reportBusy ? "提交中…" : "提交举报"}</button></div>
+        </form>}
+        {reportMessage && <p role="status" aria-live="polite" className="text-sm text-zinc-600 dark:text-zinc-300">{reportMessage}</p>}
         {shareMessage && <p role="status" aria-live="polite" className="text-sm text-zinc-600 dark:text-zinc-300">{shareMessage}</p>}
         {showShareFallback && <div className="space-y-2 rounded-lg border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-700 dark:bg-zinc-900/60">
           <label htmlFor="skill-share-url" className="block text-xs font-medium text-zinc-600 dark:text-zinc-300">Skill 链接</label>
