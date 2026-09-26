@@ -1,19 +1,16 @@
-type AgentFormValues = {
-  name: string;
-  category: string;
-  frameworks: string;
-  description: string;
-  repoUrl?: string;
-  filePath?: string;
-};
-
 type SkillFormValues = {
   name: string;
   version: string;
   description: string;
-  tags: string;
+  category: string;
   repoUrl?: string;
   filePath?: string;
+  storageBucket?: string;
+  readme?: string;
+  license?: string;
+  packageName?: string;
+  packageSize?: number;
+  packageManifest?: Record<string, unknown>;
 };
 
 // 只接受 http(s) 链接，其余（空串、javascript: 等）归一化成 null
@@ -28,34 +25,22 @@ function normalizeFilePath(value?: string): string | null {
   return trimmed || null;
 }
 
-export function buildAgentPayload(values: AgentFormValues, userId: string) {
-  return {
-    name: values.name.trim(),
-    category: values.category.trim(),
-    frameworks: values.frameworks
-      .split(/[\s,，]+/)
-      .map((f) => f.trim())
-      .filter(Boolean),
-    description: values.description.trim(),
-    repo_url: normalizeUrl(values.repoUrl),
-    file_path: normalizeFilePath(values.filePath),
-    downloads: 0,
-    user_id: userId,
-  };
-}
-
 export function buildSkillPayload(values: SkillFormValues, userId: string) {
   return {
     name: values.name.trim(),
     version: values.version.trim() || "0.1.0",
     description: values.description.trim(),
+    category: values.category.trim(),
     downloads: 0,
-    tags: values.tags
-      .split(/[\s,，]+/)
-      .map((tag) => tag.trim())
-      .filter(Boolean),
     repo_url: normalizeUrl(values.repoUrl),
     file_path: normalizeFilePath(values.filePath),
+    storage_bucket: values.storageBucket === "skill-packages" ? "skill-packages" : "packages",
+    readme: values.readme?.trim() || null,
+    license: values.license?.trim() || null,
+    package_name: values.packageName?.trim() || null,
+    package_size: values.packageSize ?? null,
+    package_manifest: values.packageManifest ?? {},
+    status: "draft",
     user_id: userId,
   };
 }

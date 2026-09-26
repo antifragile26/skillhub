@@ -1,42 +1,46 @@
-import { supabase } from "@/lib/supabase";
-import CreateMenu from "@/components/CreateMenu";
-import ThemeToggle from "@/components/ThemeToggle";
-import AuthControls from "@/components/AuthControls";
-import SkillsBrowser from "@/components/SkillsBrowser";
 import Link from "next/link";
+import { supabase } from "@/lib/supabase";
+import SkillsBrowser from "@/components/SkillsBrowser";
 
-// 每 15 秒重新从数据库读一次（而不是每次访问都读），兼顾新内容可见性和速度
-export const revalidate = 15;
+const PAGE_SIZE = 24;
 
-export default async function SkillsPage() {
-  const { data: skills } = await supabase
+function escapeLike(value: string) {
+  return value.replace(/[%,_]/g, "\\$&").replace(/[(),]/g, " ");
+}
+
+export default async function SkillsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ q?: string; page?: string }>;
+}) {
+  const params = await searchParams;
+  const query = (params.q ?? "").trim().slice(0, 80);
+  const page = Math.max(1, Number.parseInt(params.page ?? "1", 10) || 1);
+  let request = supabase
     .from("skills")
-    .select("*")
-    .order("created_at", { ascending: false })
-    .limit(60);
+    .select("id,name,version,description,category,downloads,tags,created_at", { count: "exact" })
+    .eq("status", "published")
+    .order("downloads", { ascending: false })
+    .order("created_at", { ascending: false });
+  if (query) request = request.ilike("name", `%${escapeLike(query)}%`);
+  const { data: skills, count } = await request.range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1);
+  const pageCount = Math.max(1, Math.ceil((count ?? 0) / PAGE_SIZE));
+  const querySuffix = new URLSearchParams();
+  if (query) querySuffix.set("q", query);
+  const hrefForPage = (nextPage: number) => {
+    const next = new URLSearchParams(querySuffix);
+    next.set("page", String(nextPage));
+    return `/skills?${next.toString()}`;
+  };
 
   return (
-    <div className="min-h-screen bg-white dark:bg-[#0a0e14] text-zinc-900 dark:text-zinc-100">
-      <header className="flex items-center gap-6 px-8 py-4 border-b border-zinc-200 dark:border-zinc-800">
-        <Link href="/" className="text-2xl font-bold text-blue-500 dark:text-blue-400">SkillHub</Link>
-        <nav className="ml-auto flex items-center gap-5 text-sm text-zinc-600 dark:text-zinc-300">
-          <Link href="/skills" className="hover:text-zinc-900 dark:hover:text-white">Skills</Link>
-          <Link href="/agents" className="hover:text-zinc-900 dark:hover:text-white">Agents</Link>
-          <Link href="/forum" className="hover:text-zinc-900 dark:hover:text-white">论坛</Link>
-          <CreateMenu />
-          <ThemeToggle />
-          <AuthControls />
-        </nav>
-      </header>
-      <section className="max-w-6xl mx-auto px-8 py-10">
-        {/* 标题行（与 Agent 页一致：左标题 + 右侧发布按钮） */}
-        <div className="flex items-center justify-between mb-6">
-          <h1 className="text-3xl font-bold">Skill 目录</h1>
-          <Link href="/publish" className="rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-500">发布我的 Skill</Link>
-        </div>
-
+    <main className="hub-page">
+      <section className="hub-container py-10 sm:py-12">
+        <div className="mb-8 flex flex-wrap items-end justify-between gap-4"><div><p className="hub-kicker">浏览与复用</p><h1 className="hub-page-heading mt-2">Skill 目录</h1><p className="mt-2 hub-muted">查找可复用的技能包，打开作品查看说明、下载与相关讨论。</p></div><Link href="/publish" className="hub-button-primary">发布 Skill</Link></div>
+        <form className="hub-surface mb-7 flex flex-wrap gap-3 p-4"><label htmlFor="skill-search" className="sr-only">按名称搜索 Skill</label><input id="skill-search" name="q" defaultValue={query} placeholder="按 Skill 名称搜索" className="hub-input min-w-56 flex-1" /><button className="hub-button-primary">搜索</button>{query && <Link href="/skills" className="hub-button-secondary">清除</Link>}</form>
         <SkillsBrowser skills={skills ?? []} />
+        <div className="mt-8 flex items-center justify-between gap-3 text-sm hub-muted"><span>共 {count ?? 0} 个已发布 Skill · 第 {page} / {pageCount} 页</span><div className="flex gap-2">{page > 1 && <Link href={hrefForPage(page - 1)} className="hub-button-secondary">上一页</Link>}{page < pageCount && <Link href={hrefForPage(page + 1)} className="hub-button-secondary">下一页</Link>}</div></div>
       </section>
-    </div>
+    </main>
   );
 }

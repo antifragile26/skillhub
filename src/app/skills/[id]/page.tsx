@@ -3,15 +3,13 @@
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
-import CreateMenu from "@/components/CreateMenu";
-import ThemeToggle from "@/components/ThemeToggle";
-import AuthControls from "@/components/AuthControls";
 import SkillDetail from "./SkillDetail";
 import { useEffect, useState } from "react";
 
 type Skill = {
   id: string | number;
   name: string;
+  category?: string | null;
   version?: string | null;
   description?: string | null;
   downloads?: number | null;
@@ -58,30 +56,18 @@ export default function SkillDetailPage() {
   }
 
   if (isLoading) {
-    return <div className="min-h-screen bg-white dark:bg-[#0a0e14] text-zinc-900 dark:text-zinc-100 p-8">加载中...</div>;
+    return <main className="hub-page"><div className="hub-container py-12 hub-muted">正在加载作品…</div></main>;
   }
 
   if (!skill) {
-    return <div className="min-h-screen bg-white dark:bg-[#0a0e14] text-zinc-900 dark:text-zinc-100 p-8">未找到该 Skill。</div>;
+    return <main className="hub-page"><div className="hub-container py-12"><p>未找到该 Skill。</p><Link className="mt-4 inline-flex text-sm text-[var(--accent-strong)]" href="/skills">← 返回 Skills</Link></div></main>;
   }
 
   return (
-    <div className="min-h-screen bg-white dark:bg-[#0a0e14] text-zinc-900 dark:text-zinc-100">
-      <header className="flex items-center gap-6 px-8 py-4 border-b border-zinc-200 dark:border-zinc-800">
-        <Link href="/" className="text-2xl font-bold text-blue-500 dark:text-blue-400">SkillHub</Link>
-        <nav className="ml-auto flex items-center gap-5 text-sm text-zinc-600 dark:text-zinc-300">
-          <Link href="/skills" className="hover:text-zinc-900 dark:hover:text-white">Skills</Link>
-          <Link href="/agents" className="hover:text-zinc-900 dark:hover:text-white">Agents</Link>
-          <Link href="/forum" className="hover:text-zinc-900 dark:hover:text-white">论坛</Link>
-          <CreateMenu />
-          <ThemeToggle />
-          <AuthControls />
-        </nav>
-      </header>
-
-      <section className="max-w-6xl mx-auto px-8 py-10">
+    <main className="hub-page">
+      <section className="hub-container py-8 sm:py-10">
         <div className="flex items-center justify-between">
-          <Link href="/skills" className="text-sm text-zinc-500 hover:text-zinc-900 dark:hover:text-white">← 返回 Skills</Link>
+          <Link href="/skills" className="text-sm hub-muted hover:text-[var(--accent-strong)]">← 返回 Skills</Link>
           {user && skill.user_id === user.id && (
             <button
               type="button"
@@ -96,6 +82,6 @@ export default function SkillDetailPage() {
           <SkillDetail skill={skill} />
         </div>
       </section>
-    </div>
+    </main>
   );
 }

@@ -1,136 +1,46 @@
 "use client";
 
-import { useMemo, useState } from "react";
 import Link from "next/link";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { FormEvent, useState } from "react";
 import { postCategories, categoryLabel } from "@/lib/forumCategories";
+import ProductSearchSelect from "@/components/ProductSearchSelect";
+import type { ProductSelection } from "@/components/ProductSearchSelect";
 
-type Post = {
-  id: string | number;
-  title: string;
-  content?: string | null;
-  category?: string | null;
-  author?: string | null;
-  replies?: number | null;
-  upvotes?: number | null;
-  downvotes?: number | null;
-  created_at?: string | null;
-};
+type Post = { id: string | number; title: string; category?: string | null; content_type?: string | null; author?: string | null; replies?: number | null; upvotes?: number | null; downvotes?: number | null; created_at?: string | null; updated_at?: string | null; is_featured?: boolean; pin_rank?: number | null; resolved?: boolean };
 
-export default function ForumBrowser({ posts }: { posts: Post[] }) {
-  const [sort, setSort] = useState<"latest" | "hot">("latest");
-  const [category, setCategory] = useState<string | null>(null);
-  const [query, setQuery] = useState("");
-
-  const visiblePosts = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    const list = posts.filter((p) => {
-      const matchesCategory = !category || p.category === category;
-      const matchesQuery =
-        !q ||
-        p.title.toLowerCase().includes(q) ||
-        (p.content ?? "").toLowerCase().includes(q);
-      return matchesCategory && matchesQuery;
-    });
-    if (sort === "hot") {
-      // 最热：按点赞数排序，其次回复数
-      list.sort(
-        (a, b) =>
-          (b.upvotes ?? 0) - (a.upvotes ?? 0) || (b.replies ?? 0) - (a.replies ?? 0),
-      );
-    } else {
-      // 最新：按创建时间倒序
-      list.sort(
-        (a, b) =>
-          new Date(b.created_at ?? 0).getTime() - new Date(a.created_at ?? 0).getTime(),
-      );
+export default function ForumBrowser({ posts, total, page, pageCount, selectedProduct, emptyMessage, legacyAgentFilter = false }: { posts: Post[]; total: number; page: number; pageCount: number; selectedProduct: ProductSelection | null; emptyMessage?: string; legacyAgentFilter?: boolean }) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const [query, setQuery] = useState(searchParams.get("q") ?? "");
+  const sort = searchParams.get("sort") === "hot" ? "hot" : "latest";
+  const category = searchParams.get("category") ?? "";
+  function navigate(next: { q?: string; sort?: string; category?: string; product?: string; page?: number }) {
+    const params = new URLSearchParams(searchParams.toString());
+    if (legacyAgentFilter) { params.delete("productType"); params.delete("productId"); }
+    if (next.q !== undefined) { if (next.q) params.set("q", next.q); else params.delete("q"); }
+    if (next.sort !== undefined) { if (next.sort === "latest") params.delete("sort"); else params.set("sort", next.sort); }
+    if (next.category !== undefined) { if (next.category) params.set("category", next.category); else params.delete("category"); }
+    if (next.product !== undefined) {
+      const separator = next.product.indexOf(":");
+      const type = separator > 0 ? next.product.slice(0, separator) : "";
+      const id = separator > 0 ? next.product.slice(separator + 1) : "";
+      if (type === "skill" && id) { params.set("productType", type); params.set("productId", id); }
+      else { params.delete("productType"); params.delete("productId"); }
     }
-    return list;
-  }, [posts, sort, category, query]);
+    if (next.page !== undefined && next.page > 1) params.set("page", String(next.page)); else params.delete("page");
+    router.push(`${pathname}${params.toString() ? `?${params.toString()}` : ""}`);
+  }
+  function submitSearch(event: FormEvent<HTMLFormElement>) { event.preventDefault(); navigate({ q: query.trim(), page: 1 }); }
 
-  return (
-    <>
-      {/* 搜索框 */}
-      <input
-        type="text"
-        value={query}
-        onChange={(event) => setQuery(event.target.value)}
-        placeholder="🔍 搜索帖子..."
-        className="mb-6 w-full rounded-md border border-zinc-300 bg-white px-4 py-2.5 text-sm text-zinc-900 placeholder-zinc-500 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-200"
-      />
-
-      {/* 排序切换 + 分类筛选 */}
-      <div className="mb-6 flex flex-wrap items-center gap-4">
-        <div className="flex gap-1 text-sm">
-          <button
-            type="button"
-            onClick={() => setSort("latest")}
-            className={`rounded-md px-3 py-1.5 ${sort === "latest" ? "bg-zinc-700 text-white" : "text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200"}`}
-          >
-            最新
-          </button>
-          <button
-            type="button"
-            onClick={() => setSort("hot")}
-            className={`rounded-md px-3 py-1.5 ${sort === "hot" ? "bg-zinc-700 text-white" : "text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200"}`}
-          >
-            最热
-          </button>
-        </div>
-
-        <div className="ml-auto flex flex-wrap gap-2 text-sm">
-          {postCategories.map((c) => (
-            <button
-              key={c.value}
-              type="button"
-              onClick={() => setCategory(category === c.value ? null : c.value)}
-              className={`rounded-md px-3 py-1.5 ${
-                category === c.value
-                  ? "bg-zinc-700 text-white"
-                  : "border border-zinc-300 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:border-zinc-400 dark:hover:border-zinc-500"
-              }`}
-            >
-              {c.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* 帖子列表 */}
-      <div className="space-y-3">
-        {visiblePosts.length === 0 ? (
-          <p className="py-10 text-center text-sm text-zinc-500">没有匹配的帖子。</p>
-        ) : (
-          visiblePosts.map((post) => (
-            <Link
-              key={post.id}
-              href={`/forum/${post.id}`}
-              className="flex items-start gap-4 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/40 p-4 hover:border-zinc-300 dark:hover:border-zinc-600"
-            >
-              {/* 左侧投票 */}
-              <div className="flex flex-col items-center text-xs">
-                <span className="text-green-600 dark:text-green-500">▲ {post.upvotes ?? 0}</span>
-                <span className="text-red-600 dark:text-red-500">▼ {post.downvotes ?? 0}</span>
-              </div>
-
-              {/* 中间内容 */}
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
-                  {post.category && (
-                    <span className="rounded border border-zinc-300 dark:border-zinc-700 px-1.5 py-0.5 text-[11px] text-zinc-500">{categoryLabel(post.category)}</span>
-                  )}
-                  <span className="font-medium hover:text-blue-600 dark:hover:text-blue-400">{post.title}</span>
-                </div>
-                <div className="mt-1 flex items-center gap-2 text-xs text-zinc-500">
-                  <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-purple-500/20 text-[10px]">🤖</span>
-                  <span className="text-purple-500 dark:text-purple-400">{post.author || "用户"}</span>
-                  <span>· {post.replies ?? 0} replies</span>
-                  {post.created_at && <span>· {new Date(post.created_at).toLocaleDateString()}</span>}
-                </div>
-              </div>
-            </Link>
-          ))
-        )}
-      </div>
-    </>
-  );
+  return <>
+    <form onSubmit={submitSearch} className="mb-5 flex gap-2"><label htmlFor="forum-search" className="sr-only">搜索论坛</label><input id="forum-search" type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索标题、问题或经验" className="hub-input min-w-0 flex-1" /><button type="submit" className="hub-button-primary">搜索</button></form>
+    {legacyAgentFilter && <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-100"><span>Agent 作品筛选已停止使用。历史帖子仍可阅读，你可以筛选 Skill 或查看全部讨论。</span><Link href="/forum" className="font-medium underline">查看全部讨论</Link></div>}
+    <section className="hub-surface mb-6 p-4 sm:p-5"><h2 className="mb-1 text-sm font-semibold">按关联 Skill 筛选</h2><p className="mb-3 text-xs hub-muted">搜索并选择一个 Skill，只查看与它关联的讨论。</p><ProductSearchSelect selected={selectedProduct} onSelect={(product) => navigate({ product: `${product.type}:${product.id}`, page: 1 })} onClear={() => navigate({ product: "", page: 1 })} /></section>
+    <div className="mb-6 flex flex-wrap items-center gap-3"><div className="flex gap-1 text-sm" aria-label="排序"><button type="button" onClick={() => navigate({ sort: "latest", page: 1 })} aria-pressed={sort === "latest"} className={`rounded-md px-3 py-1.5 ${sort === "latest" ? "bg-zinc-700 text-white" : "text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200"}`}>最新</button><button type="button" onClick={() => navigate({ sort: "hot", page: 1 })} aria-pressed={sort === "hot"} className={`rounded-md px-3 py-1.5 ${sort === "hot" ? "bg-zinc-700 text-white" : "text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200"}`}>最热</button></div><div className="flex flex-wrap gap-2 text-sm" aria-label="分类"><button type="button" onClick={() => navigate({ category: "", page: 1 })} aria-pressed={!category} className={`rounded-md px-3 py-1.5 ${!category ? "bg-blue-600 text-white" : "border border-zinc-300 text-zinc-600 dark:border-zinc-700 dark:text-zinc-400"}`}>全部</button>{postCategories.map((item) => <button key={item.value} type="button" onClick={() => navigate({ category: category === item.value ? "" : item.value, page: 1 })} aria-pressed={category === item.value} className={`rounded-md px-3 py-1.5 ${category === item.value ? "bg-blue-600 text-white" : "border border-zinc-300 text-zinc-600 dark:border-zinc-700 dark:text-zinc-400"}`}>{item.label}</button>)}</div></div>
+    <p className="mb-3 text-sm hub-muted">共 {total} 篇 · 第 {page}/{Math.max(pageCount, 1)} 页</p>
+    <div className="space-y-3">{posts.length === 0 ? <p className="hub-surface py-12 text-center text-sm hub-muted">{emptyMessage ?? "没有匹配的帖子。可以更换关键词或分类后重试。"}</p> : posts.map((post) => <Link key={post.id} href={`/forum/${post.id}`} className="hub-surface group flex items-start gap-4 p-4 transition hover:border-[var(--accent)] sm:p-5"><div className="flex shrink-0 flex-col items-center text-xs"><span className="font-semibold text-[var(--positive)]">▲ {post.upvotes ?? 0}</span><span className="mt-1 hub-muted">▼ {post.downvotes ?? 0}</span></div><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><span className="hub-chip">{categoryLabel(post.category) || "综合讨论"}</span>{post.content_type === "case" && <span className="hub-chip hub-chip-active">经验分享</span>}{post.resolved && <span className="hub-chip">已解决</span>}{post.is_featured && <span className="hub-chip">精选</span>}{post.pin_rank && <span className="hub-chip">置顶</span>}<span className="font-semibold group-hover:text-[var(--accent-strong)]">{post.title}</span></div><div className="mt-2 flex flex-wrap items-center gap-2 text-xs hub-muted"><span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-[var(--accent-soft)] text-[var(--accent-strong)]">{(post.author || "社").charAt(0)}</span><span>{post.author || "社区用户"}</span><span>· {post.replies ?? 0} 回复</span>{post.created_at && <span>· {new Date(post.created_at).toLocaleDateString("zh-CN")}</span>}{post.updated_at && post.updated_at !== post.created_at && <span>· 已编辑</span>}</div></div></Link>)}</div>
+    {pageCount > 1 && <nav className="mt-8 flex items-center justify-center gap-3" aria-label="论坛分页"><button type="button" disabled={page <= 1} onClick={() => navigate({ page: page - 1 })} className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm disabled:opacity-40 dark:border-zinc-700">上一页</button><span className="text-sm text-zinc-500">{page} / {pageCount}</span><button type="button" disabled={page >= pageCount} onClick={() => navigate({ page: page + 1 })} className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm disabled:opacity-40 dark:border-zinc-700">下一页</button></nav>}
+  </>;
 }

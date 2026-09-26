@@ -1,19 +1,26 @@
 "use client";
 
-import { useState } from "react";
-import { extractFirstUrl, linkifyText } from "@/lib/linkify";
+import { useRef, useState } from "react";
+import ProductDiscussions from "@/components/ProductDiscussions";
+import SafeMarkdown from "@/components/SafeMarkdown";
+import { extractFirstUrl } from "@/lib/linkify";
+import { skillCategoryLabel } from "@/lib/skillCategories";
 import { supabase } from "@/lib/supabase";
 
 type Skill = {
   id: string | number;
   name: string;
+  category?: string | null;
   version?: string | null;
   description?: string | null;
   downloads?: number | null;
-  tags?: string[] | null;
   created_at?: string | null;
   repo_url?: string | null;
   file_path?: string | null;
+  storage_bucket?: "packages" | "skill-packages" | null;
+  readme?: string | null;
+  license?: string | null;
+  package_name?: string | null;
 };
 
 // 目前只有 README 有真实内容，其余 tab 待实现前先不展示
@@ -21,22 +28,58 @@ const tabs = ["README"] as const;
 
 export default function SkillDetail({ skill }: { skill: Skill }) {
   const [tab, setTab] = useState<(typeof tabs)[number]>("README");
+  const [shareUrl, setShareUrl] = useState("");
+  const [shareMessage, setShareMessage] = useState("");
+  const [showShareFallback, setShowShareFallback] = useState(false);
+  const shareInputRef = useRef<HTMLInputElement>(null);
   const repoUrl = skill.repo_url || extractFirstUrl(skill.description);
   const hasFile = !!skill.file_path;
 
   async function handleDownload() {
     if (hasFile && skill.file_path) {
-      // 下载文件包
-      const { data } = supabase.storage.from("packages").getPublicUrl(skill.file_path);
-      window.open(data.publicUrl, "_blank");
-      // 计数 +1
-      await supabase.rpc("increment_skill_downloads", { skill_id: skill.id });
+      // 让浏览器直接处理 Content-Disposition 下载，避免内置浏览器对 Blob 下载卡在“即将完成”。
+      window.location.assign(`/api/skills/${encodeURIComponent(String(skill.id))}/download`);
+      return;
     } else if (repoUrl) {
-      // 跳转仓库
-      window.open(repoUrl, "_blank");
-      // 计数 +1
       await supabase.rpc("increment_skill_downloads", { skill_id: skill.id });
+      window.open(repoUrl, "_blank", "noopener,noreferrer");
     }
+  }
+
+  async function shareSkill() {
+    const url = new URL(`/skills/${encodeURIComponent(String(skill.id))}`, window.location.origin).toString();
+    setShareUrl(url);
+    setShareMessage("");
+
+    if (window.isSecureContext && navigator.clipboard?.writeText) {
+      try {
+        await navigator.clipboard.writeText(url);
+        setShowShareFallback(false);
+        setShareMessage("Skill 链接已复制。");
+        return;
+      } catch {
+        // Show a selectable link below when clipboard permission is denied.
+      }
+    }
+
+    setShowShareFallback(true);
+    setShareMessage("浏览器无法直接复制，请复制下方链接。");
+  }
+
+  function copyShareLinkFallback() {
+    const input = shareInputRef.current;
+    if (!input) return;
+    input.focus();
+    input.select();
+    try {
+      if (document.execCommand("copy")) {
+        setShareMessage("Skill 链接已复制。");
+        return;
+      }
+    } catch {
+      // Keep the text selected so the user can copy it with the keyboard.
+    }
+    setShareMessage("链接已选中，请按 Ctrl+C 复制。");
   }
 
   return (
@@ -49,7 +92,8 @@ export default function SkillDetail({ skill }: { skill: Skill }) {
             <h1 className="font-mono text-3xl font-bold">{skill.name}</h1>
             <div className="mt-1 text-sm text-zinc-500">
               <span className="font-mono">{skill.version ?? "0.1.0"}</span>
-              <span className="ml-3 font-mono">MIT</span>
+              <span className="ml-3 rounded-full bg-blue-100 px-2 py-0.5 text-xs text-blue-700 dark:bg-blue-500/10 dark:text-blue-300">{skillCategoryLabel(skill.category)}</span>
+              {skill.license && <span className="ml-3 font-mono">{skill.license}</span>}
             </div>
           </div>
         </div>
@@ -75,9 +119,7 @@ export default function SkillDetail({ skill }: { skill: Skill }) {
         {/* tab 内容 */}
         <div className="mt-6">
           {tab === "README" ? (
-            <p className="whitespace-pre-wrap text-zinc-700 dark:text-zinc-300">
-              {skill.description ? linkifyText(skill.description) : "作者暂未填写说明。"}
-            </p>
+            <SafeMarkdown className="hub-content-prose" content={skill.readme || skill.description || "作者暂未填写说明。"} />
           ) : (
             <p className="text-sm text-zinc-500">暂无内容。</p>
           )}
@@ -89,13 +131,20 @@ export default function SkillDetail({ skill }: { skill: Skill }) {
         {(hasFile || repoUrl) && (
           <button
             onClick={handleDownload}
-            className="w-full flex items-center justify-center gap-2 rounded-lg bg-green-600 px-4 py-3 text-sm font-medium text-white hover:bg-green-500"
+            className="hub-button-primary w-full"
           >
-            {hasFile ? "⬇ 下载文件包" : "↗ 查看源码仓库"}
+            {hasFile ? "⬇ 下载 Skill 包" : "↗ 查看源码仓库"}
           </button>
         )}
+        <button type="button" onClick={shareSkill} className="hub-button-secondary w-full">分享此 Skill</button>
+        {shareMessage && <p role="status" aria-live="polite" className="text-sm text-zinc-600 dark:text-zinc-300">{shareMessage}</p>}
+        {showShareFallback && <div className="space-y-2 rounded-lg border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-700 dark:bg-zinc-900/60">
+          <label htmlFor="skill-share-url" className="block text-xs font-medium text-zinc-600 dark:text-zinc-300">Skill 链接</label>
+          <input id="skill-share-url" ref={shareInputRef} readOnly value={shareUrl} onFocus={(event) => event.currentTarget.select()} className="w-full rounded-md border border-zinc-300 bg-white px-2 py-2 text-xs text-zinc-800 outline-none focus:border-blue-500 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-200" />
+          <button type="button" onClick={copyShareLinkFallback} className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800">复制链接</button>
+        </div>}
 
-        <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/40 p-5 text-sm">
+        <div className="hub-surface-soft p-5 text-sm">
           <div className="flex items-center justify-between py-1">
             <span className="text-zinc-500">总下载量</span>
             <span className="font-semibold">{skill.downloads ?? 0}</span>
@@ -104,25 +153,14 @@ export default function SkillDetail({ skill }: { skill: Skill }) {
             <span className="text-zinc-500">当前版本</span>
             <span className="font-mono text-xs">{skill.version ?? "0.1.0"}</span>
           </div>
-          <div className="flex items-center justify-between py-1">
-            <span className="text-zinc-500">评分</span>
-            <span className="text-zinc-400">未标注</span>
-          </div>
+          {skill.package_name && <div className="flex items-center justify-between gap-3 py-1"><span className="text-zinc-500">文件包</span><span className="truncate font-mono text-xs">{skill.package_name}</span></div>}
         </div>
 
-        <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/40 p-5">
-          <p className="mb-3 text-sm font-medium">兼容框架</p>
-          <div className="flex flex-wrap gap-2">
-            {(skill.tags ?? []).length > 0 ? (
-              (skill.tags ?? []).map((tag) => (
-                <span key={tag} className="rounded bg-blue-100 dark:bg-blue-500/10 px-2 py-0.5 text-xs font-mono text-blue-700 dark:text-blue-300">{tag}</span>
-              ))
-            ) : (
-              <span className="text-sm text-zinc-500">未标注</span>
-            )}
-          </div>
-        </div>
       </aside>
+
+      <div className="lg:col-span-2">
+        <ProductDiscussions productType="skill" productId={skill.id} />
+      </div>
     </div>
   );
 }

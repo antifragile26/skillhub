@@ -1,66 +1,31 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
-  buildAgentPayload,
   buildCommentPayload,
   buildSkillPayload,
 } from "./contentPayloads.ts";
 
-test("buildAgentPayload trims fields, parses frameworks, and attaches the current user", () => {
-  assert.deepEqual(
-    buildAgentPayload(
-      {
-        name: " Research Agent ",
-        category: " research ",
-        frameworks: "LangGraph, CrewAI  AutoGen",
-        description: " Helps research. ",
-        repoUrl: " https://github.com/x/agent ",
-      },
-      "user-1",
-    ),
-    {
-      name: "Research Agent",
-      category: "research",
-      frameworks: ["LangGraph", "CrewAI", "AutoGen"],
-      description: "Helps research.",
-      repo_url: "https://github.com/x/agent",
-      file_path: null,
-      downloads: 0,
-      user_id: "user-1",
-    },
-  );
-});
-
-test("buildAgentPayload rejects non-http repo urls and keeps file_path", () => {
-  const payload = buildAgentPayload(
-    {
-      name: "A",
-      category: "other",
-      frameworks: "",
-      description: "d",
-      repoUrl: "javascript:alert(1)",
-      filePath: "packages/agents/a.zip",
-    },
-    "user-x",
-  );
-  assert.equal(payload.repo_url, null);
-  assert.equal(payload.file_path, "packages/agents/a.zip");
-});
-
-test("buildSkillPayload parses tags and defaults version/downloads", () => {
+test("buildSkillPayload defaults version/downloads without requiring tags", () => {
   assert.deepEqual(
     buildSkillPayload(
-      { name: " browser ", version: " ", description: " Automates pages. ", tags: "web, 浏览器  cli" },
+      { name: " browser ", version: " ", description: " Automates pages.", category: "general-tools" },
       "user-2",
     ),
     {
       name: "browser",
       version: "0.1.0",
       description: "Automates pages.",
+      category: "general-tools",
       downloads: 0,
-      tags: ["web", "浏览器", "cli"],
       repo_url: null,
       file_path: null,
+      storage_bucket: "packages",
+      readme: null,
+      license: null,
+      package_name: null,
+      package_size: null,
+      package_manifest: {},
+      status: "draft",
       user_id: "user-2",
     },
   );

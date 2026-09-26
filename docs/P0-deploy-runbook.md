@@ -29,7 +29,9 @@ pm2 status skillhub
 1. 打开 `/forum`，记录状态码、帖子数量和标题。
 2. 点击列表中的真实帖子，打开 `/forum/<实际ID>`，核对标题和正文。
 3. 打开 `/forum/new`；未登录时按设计进入登录页，登录测试账号后确认表单可见。测试账号和测试内容必须与生产用户隔离。
-4. 返回 `/forum`，刷新并再次打开原帖子详情；核对原帖子仍在，且 `posts/comments/skills/agents` 行数没有无法解释的减少。
+4. 返回 `/forum`，刷新并再次打开原帖子详情；核对原帖子仍在，且 `posts/comments/skills/agents/content_product_links` 行数没有无法解释的减少。Agent 作品入口应显示下线说明；历史帖子关联不得删除或自动改绑。
+
+本次 SkillHub 方向调整的发布验收还需检查：导航和首页只展示 Skills 与论坛；`/agents`、`/agents/new` 及旧 Agent 详情 URL 显示下线说明；论坛筛选和发帖表单只允许 Skill 关联；对旧 `productType=agent` 参数给出提示并允许不关联继续发帖。
 
 当前可体验的旁路预览：<https://deploy-preview-1--skillhub-1785163757.netlify.app/forum>。该链接已按上述四步完成浏览器验收；正式 3015 仍需目标服务器访问和切换审批。
 

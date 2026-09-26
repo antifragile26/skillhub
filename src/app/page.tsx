@@ -1,93 +1,46 @@
-// 这是首页文件。下面的代码描述了页面上要显示什么、长什么样。
-
-// 从我们刚写的连接文件里，拿到访问数据库的通道
-import { supabase } from "@/lib/supabase";
-import CreateMenu from "@/components/CreateMenu";
-import ThemeToggle from "@/components/ThemeToggle";
-import AuthControls from "@/components/AuthControls";
 import Link from "next/link";
+import { supabase } from "@/lib/supabase";
 
-// 注意这里多了 async —— 意思是"这个页面需要等数据库回话"
 export default async function Home() {
-
-  // 👇 去数据库问一句："skills 表里的数据，按下载量从高到低给我"
-  const { data: trendingSkills } = await supabase
-    .from("skills")           // 从 skills 这张表
-    .select("*")              // 要所有列
-    .order("downloads", { ascending: false }); // 按下载量从高到低排
-
-  return (
-    // 整个页面：深色背景（接近黑），文字浅色
-    <div className="min-h-screen bg-white dark:bg-[#0a0e14] text-zinc-900 dark:text-zinc-100">
-
-      {/* ===== 顶部导航栏 ===== */}
-      <header className="flex items-center gap-6 px-8 py-4 border-b border-zinc-200 dark:border-zinc-800">
-        {/* 左边：蓝色 Logo */}
-        <div className="text-2xl font-bold text-blue-500 dark:text-blue-400">SkillHub</div>
-        {/* 右边：导航链接 + 按钮（靠右对齐） */}
-        <nav className="ml-auto flex items-center gap-5 text-sm text-zinc-600 dark:text-zinc-300">
-          <Link href="/skills" className="hover:text-zinc-900 dark:hover:text-white">Skills</Link>
-          <Link href="/agents" className="hover:text-zinc-900 dark:hover:text-white">Agents</Link>
-          <Link href="/forum" className="hover:text-zinc-900 dark:hover:text-white">论坛</Link>
-          <CreateMenu />
-          <ThemeToggle />
-          <AuthControls />
-        </nav>
-      </header>
-
-      {/* ===== 中间的大标题区 ===== */}
-      <section className="flex flex-col items-center text-center py-20 px-4">
-        <h1 className="text-5xl font-extrabold tracking-tight">
-          <span className="text-blue-500 dark:text-blue-400">AI Agent 技能</span>
-          <span className="text-zinc-900 dark:text-white">的开放注册中心</span>
-        </h1>
-        <p className="mt-5 text-lg text-zinc-500 dark:text-zinc-400">发现、发布、分享你的 Agent Skill</p>
-
-        {/* 两个按钮 */}
-        <div className="mt-8 flex gap-4">
-          <Link href="/skills" className="rounded-md bg-green-600 px-6 py-3 font-medium text-white hover:bg-green-500">浏览全部</Link>
-          <Link href="/publish" className="rounded-md border border-zinc-300 dark:border-zinc-600 px-6 py-3 hover:bg-zinc-100 dark:hover:bg-zinc-800">发布你的第一个 Skill →</Link>
+  const [{ data: skills }, { count: skillCount }, { count: postCount }] = await Promise.all([
+    supabase.from("skills").select("id,name,version,description,category,downloads,tags").eq("status", "published").order("downloads", { ascending: false }).limit(1),
+    supabase.from("skills").select("id", { count: "exact", head: true }).eq("status", "published"),
+    supabase.from("posts").select("id", { count: "exact", head: true }).is("deleted_at", null),
+  ]);
+  const featured = skills?.[0];
+  return <main className="hub-page">
+    <section className="home-hero">
+      <div className="hub-container home-hero-layout">
+        <div>
+          <p className="hub-kicker">Skills 分享与交流社区</p>
+          <h1 className="home-hero-title">发现能用的 Skill，<br />分享真实使用经验。</h1>
+          <p className="home-hero-copy">浏览可复用的技能包，查看说明与获取方式；遇到问题时，在论坛提问，也可以关联对应 Skill。</p>
+          <div className="mt-7 flex flex-wrap gap-3">
+            <Link href="/skills" className="hub-button-primary">探索 Skills <span aria-hidden="true">→</span></Link>
+            <Link href="/forum" className="hub-button-secondary">浏览社区讨论</Link>
+          </div>
+          <div className="mt-8 flex flex-wrap gap-x-7 gap-y-2 text-sm hub-muted">
+            <span><strong className="mr-1 text-[var(--foreground)]">{skillCount ?? 0}</strong> Skills</span>
+            <span><strong className="mr-1 text-[var(--foreground)]">{postCount ?? 0}</strong> 讨论</span>
+          </div>
         </div>
-
-        {/* 三个统计 */}
-        <div className="mt-10 flex gap-10 text-sm font-medium text-zinc-600 dark:text-zinc-400">
-          <Link href="/skills" className="hover:text-blue-600 dark:hover:text-blue-400">📦 Skills</Link>
-          <Link href="/agents" className="hover:text-blue-600 dark:hover:text-blue-400">🤖 Agents</Link>
-          <Link href="/forum" className="hover:text-blue-600 dark:hover:text-blue-400">💬 论坛</Link>
+        <div className="home-feature">
+          <div className="home-feature-rule" />
+          <p className="mt-4 hub-kicker">精选 Skill</p>
+          {featured ? <>
+            <Link href={`/skills/${featured.id}`} className="mt-3 block text-xl font-semibold tracking-tight hover:text-[var(--accent-strong)]">{featured.name}<span className="ml-2 text-sm font-normal hub-muted">v{featured.version ?? "0.1.0"}</span></Link>
+            <p className="mt-3 line-clamp-3 text-sm leading-6 hub-muted">{featured.description || "查看作品说明、获取方式，以及使用者分享的经验。"}</p>
+            <div className="mt-5 flex items-center justify-between border-t border-[var(--border)] pt-4 text-xs hub-muted"><span>下载 {featured.downloads ?? 0}</span><Link href={`/skills/${featured.id}`} className="font-semibold text-[var(--accent-strong)]">查看 Skill →</Link></div>
+          </> : <><h2 className="mt-3 text-xl font-semibold">从一个 Skill 开始</h2><p className="mt-3 text-sm leading-6 hub-muted">浏览社区分享的技能，或发布你的第一个 Skill。</p><Link href="/publish" className="mt-5 inline-flex text-sm font-semibold text-[var(--accent-strong)]">发布 Skill →</Link></>}
         </div>
-      </section>
-
-      {/* ===== 本周趋势 Skill ===== */}
-      <section className="max-w-6xl mx-auto px-8 pb-20">
-        {/* 标题行：左边标题，右边"查看全部" */}
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-xl font-bold">🔥 本周趋势 Skill</h2>
-          <Link href="/skills" className="text-sm text-blue-600 dark:text-blue-400 hover:underline">查看全部 →</Link>
-        </div>
-
-        {/* 卡片网格：一行 3 个 */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-          {(trendingSkills ?? []).map((skill) => (
-            <Link key={skill.id} href={`/skills/${skill.id}`} className="block rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/40 p-5 hover:border-zinc-300 dark:hover:border-zinc-600">
-              {/* 名字 + 版本 */}
-              <div className="flex items-start justify-between">
-                <span className="font-mono text-blue-600 dark:text-blue-300">{skill.name}</span>
-                <span className="text-xs text-zinc-400 dark:text-zinc-500">{skill.version}</span>
-              </div>
-              {/* 描述 */}
-              <p className="mt-3 text-sm text-zinc-600 dark:text-zinc-400">{skill.description}</p>
-              {/* 下载量 */}
-              <p className="mt-4 text-sm text-zinc-500">↓ {skill.downloads}</p>
-              {/* 标签 */}
-              <div className="mt-3 flex gap-2">
-                {(skill.tags ?? []).map((tag: string) => (
-                  <span key={tag} className="rounded bg-blue-100 dark:bg-blue-500/10 px-2 py-0.5 text-xs font-mono text-blue-700 dark:text-blue-300">{tag}</span>
-                ))}
-              </div>
-            </Link>
-          ))}
-        </div>
-      </section>
-    </div>
-  );
+      </div>
+    </section>
+    <section className="hub-container home-section">
+      <div className="grid gap-4 md:grid-cols-2">
+        {[{ href: "/skills", eyebrow: "可复用的能力", title: "探索 Skills", copy: "按名称和用途查找技能包，打开详情查看说明与下载方式。" }, { href: "/forum", eyebrow: "围绕 Skills 交流", title: "进入论坛", copy: "提问、反馈使用问题，或分享实践经验。" }].map((item) => <Link key={item.href} href={item.href} className="hub-surface group p-5 transition hover:-translate-y-0.5 hover:border-[var(--accent)]">
+          <span className="hub-kicker">{item.eyebrow}</span><h2 className="mt-3 text-lg font-semibold tracking-tight group-hover:text-[var(--accent-strong)]">{item.title}<span className="ml-2 text-sm">↗</span></h2><p className="mt-2 text-sm leading-6 hub-muted">{item.copy}</p>
+        </Link>)}
+      </div>
+    </section>
+  </main>;
 }
