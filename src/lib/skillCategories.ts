@@ -8,16 +8,66 @@ export const skillCategoryDefinitions = [
   { value: "industry-services", label: "行业专业服务", keywords: ["法律合规", "餐饮管理", "房地产", "能源环保", "物流供应链", "建筑工程", "工业制造", "旅游酒店", "交通出行", "咨询顾问", "医疗健康", "公共服务", "航空航天工程", "行业", "法律", "legal", "logistics", "construction", "manufacturing", "travel", "transport", "consulting", "health"] },
   { value: "life-development", label: "生活与个人发展", keywords: ["宠物护理", "宠物护理工具", "婚礼预算管理", "婚礼规划", "生活服务", "娱乐休闲", "职业发展", "占星术与命理学应用开发", "占卜命理", "命理研究", "个人反思", "家庭", "生活", "career", "lifestyle", "pet", "wedding", "entertainment"] },
   { value: "docs-knowledge", label: "文档与知识管理", keywords: ["知识管理系统", "个人知识管理", "文档处理", "格式转换", "PDF文档处理", "PDF文档转换", "搜索工具", "知识", "文档", "document", "pdf", "docx", "spreadsheet", "knowledge", "search", "memory", "retrieval"] },
-  { value: "general-tools", label: "通用工具与方法", keywords: ["无", "未指定", "通用", "技能", "工具应用", "工具使用分析", "技能管理", "工具软件", "系统工具", "工具", "问题解决技能", "技能写作", "通用技能", "思维方法", "general", "tool", "utility", "skill", "workflow", "cli", "terminal", "filesystem", "mcp"] },
+  { value: "general-tools", label: "通用工具与方法", keywords: ["无", "未指定", "通用", "通用工具", "思维方法", "general", "unclassified"] },
 ] as const;
 
 export type SkillCategoryValue = (typeof skillCategoryDefinitions)[number]["value"];
 
+const categoryAliases: Record<SkillCategoryValue, readonly string[]> = {
+  "software-ai": [
+    "software development", "programming", "code review", "debugging", "bug report", "release notes",
+    "readme", "api", "代码", "编程", "软件开发", "调试", "故障排查", "缺陷报告", "版本发布", "开发文档",
+  ],
+  "product-design": [
+    "product management", "product design", "requirements", "user research", "user interview", "acceptance criteria", "acceptance checklist",
+    "产品", "需求分析", "需求整理", "需求澄清", "用户研究", "用户访谈", "验收", "原型", "产品复盘",
+  ],
+  "business-finance": [
+    "business plan", "pricing", "revenue", "budget", "商业计划", "经营分析", "定价", "财务分析", "预算",
+  ],
+  "content-media": [
+    "article", "editing", "copywriting", "content creation", "文章", "写作", "编辑", "文案", "内容创作", "媒体",
+  ],
+  "research-education": [
+    "research brief", "source comparison", "learning plan", "self test", "quiz", "study", "academic research",
+    "研究简报", "资料研究", "资料对比", "来源对比", "学习计划", "学习", "自测", "测验", "课程", "科研",
+  ],
+  "office-collaboration": [
+    "work email", "meeting minutes", "weekly report", "project handover", "presentation", "team collaboration", "retrospective",
+    "工作邮件", "邮件", "会议纪要", "行动项", "周报", "项目交接", "交接", "汇报", "演示文稿", "团队协作", "项目复盘",
+  ],
+  "industry-services": [
+    "legal services", "healthcare", "logistics", "construction", "manufacturing", "医疗健康", "法律服务", "物流", "建筑工程", "制造业",
+  ],
+  "life-development": [
+    "career planning", "personal development", "personal reflection", "职业规划", "个人成长", "个人反思",
+  ],
+  "docs-knowledge": [
+    "long form reader", "long-form-reader", "reading notes", "knowledge management", "document processing", "technical documentation",
+    "阅读笔记", "长文阅读", "长文摘要", "知识整理", "知识管理", "文档处理", "技术文档", "说明文档", "readme",
+  ],
+  "general-tools": ["general purpose", "通用用途"],
+};
+
+function keywordMatches(value: string, keyword: string) {
+  const normalized = value.toLowerCase();
+  const query = keyword.toLowerCase().trim();
+  if (!query) return false;
+
+  // Chinese phrases are matched as phrases; English words are matched as tokens
+  // so short strings such as "ai" do not match inside unrelated words.
+  if (/[\u3400-\u9fff]/.test(query)) {
+    return normalized.replace(/[\s\p{P}\p{S}]/gu, "").includes(query.replace(/[\s\p{P}\p{S}]/gu, ""));
+  }
+
+  const tokens = new Set(normalized.match(/[a-z0-9+#.]+/g) ?? []);
+  const queryTokens = query.match(/[a-z0-9+#.]+/g) ?? [];
+  return queryTokens.length > 0 && queryTokens.every((token) => tokens.has(token));
+}
+
 function categoryScore(value: string, keywords: readonly string[], weight: number) {
-  const normalized = value.trim().toLowerCase();
-  if (!normalized) return 0;
-  const tokens = new Set(normalized.split(/[^a-z0-9+#.-]+/).filter(Boolean));
-  return keywords.reduce((score, keyword) => score + (tokens.has(keyword) || (keyword.length > 3 && normalized.includes(keyword)) ? weight : 0), 0);
+  if (!value.trim()) return 0;
+  return new Set(keywords.filter((keyword) => keywordMatches(value, keyword))).size * weight;
 }
 
 export function isSkillCategory(value?: string | null): value is SkillCategoryValue {
@@ -29,12 +79,16 @@ export function skillCategoryLabel(value?: string | null) {
 }
 
 export function recommendSkillCategory(name: string, description: string, tags: string[] = []): SkillCategoryValue {
+  const evidence = [
+    { value: name, weight: 5 },
+    { value: description, weight: 2 },
+    { value: tags.join(" "), weight: 7 },
+  ];
   let selected: SkillCategoryValue = "general-tools";
   let highestScore = 0;
   for (const category of skillCategoryDefinitions) {
-    const score = categoryScore(name, category.keywords, 2)
-      + categoryScore(description, category.keywords, 1)
-      + tags.reduce((total, tag) => total + categoryScore(tag, category.keywords, 4), 0);
+    const keywords = [...category.keywords, ...categoryAliases[category.value]];
+    const score = evidence.reduce((total, source) => total + categoryScore(source.value, keywords, source.weight), 0);
     if (score > highestScore) {
       selected = category.value;
       highestScore = score;

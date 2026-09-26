@@ -59,7 +59,7 @@ export default function PublishPage() {
       setManifest(nextManifest);
       setName((current) => current || nextManifest.name || "");
       setDescription((current) => current || nextManifest.description || "");
-      setCategory(recommendSkillCategory(nextManifest.name || "", nextManifest.description || ""));
+      setCategory(recommendSkillCategory(nextManifest.name || "", nextManifest.description || "", nextManifest.tags));
       setLicense((current) => current || nextManifest.license || "");
       setMessage("已读取 SKILL.md，名称、简介和推荐分类已填入；提交前可以继续修改。");
     } catch (error) {
@@ -151,7 +151,7 @@ export default function PublishPage() {
 
         <div><label className={labelClassName} htmlFor="skill-description">简介</label><textarea id="skill-description" value={description} onChange={(event) => setDescription(event.target.value)} className={`${inputClassName} min-h-32 resize-y`} placeholder="说明它能解决什么问题、适合什么场景。" /></div>
 
-        <div><label className={labelClassName} htmlFor="skill-category">推荐分类（可修改）</label><select id="skill-category" value={category} onChange={(event) => setCategory(event.target.value as SkillCategoryValue)} className={inputClassName}>{skillCategoryDefinitions.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select><p className="mt-1 text-xs text-zinc-500">上传 ZIP 后会根据 SKILL.md 的名称和简介推荐一个分类；提交前可以自行修改确认。</p></div>
+        <div><label className={labelClassName} htmlFor="skill-category">推荐分类（可修改）</label><select id="skill-category" value={category} onChange={(event) => setCategory(event.target.value as SkillCategoryValue)} className={inputClassName}>{skillCategoryDefinitions.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select><p className="mt-1 text-xs text-zinc-500">上传 ZIP 后会综合 SKILL.md 的名称、简介和标签推荐分类；提交前可以自行修改确认。</p></div>
 
         <div className="grid gap-6 md:grid-cols-2">
           <div><label className={labelClassName} htmlFor="skill-license">许可证（可选）</label><input id="skill-license" value={license} onChange={(event) => setLicense(event.target.value)} className={inputClassName} placeholder="例如：MIT；不确定可以留空" /><p className="mt-1 text-xs text-zinc-500">MIT 是常见的开源许可证；不确定授权方式时可以暂不填写。</p></div>
