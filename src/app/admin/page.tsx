@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { contentTypeLabels, getSupabaseErrorMessage, statusLabels } from "@/lib/batch2";
 import { automatedReviewLabel, automatedReviewSummary } from "@/lib/moderation";
+import { isKnowledgeCategory, knowledgeCategories } from "@/lib/knowledgeCategories";
 import { skillCategoryLabel } from "@/lib/skillCategories";
 import { supabase } from "@/lib/supabase";
 
@@ -177,6 +178,24 @@ export default function AdminPage() {
   async function createKnowledge(post: PendingPost) {
     await runAction(`knowledge-${post.id}`, () => supabase.rpc("create_knowledge_from_post", { p_post_id: post.id }), "知识草稿已创建，可继续编辑后发布。");
   }
+  async function generateKnowledge() {
+    setBusy("knowledge-generate");
+    try {
+      const response = await fetch("/api/admin/knowledge/generate", { method: "POST", credentials: "same-origin" });
+      const result = (await response.json()) as { error?: string; title?: string; warning?: string };
+      if (!response.ok) {
+        setFeedback({ type: "error", text: result.error || "知识草稿生成失败，请稍后重试。" });
+        return;
+      }
+      setFeedback({ type: result.warning ? "info" : "success", text: result.warning ? `「${result.title || "新知识"}」${result.warning}` : `已生成「${result.title || "新知识"}」草稿，请核对来源和内容后发布。` });
+      await load();
+      document.getElementById("knowledge-publishing")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    } catch (error) {
+      setFeedback({ type: "error", text: errorMessage(error) });
+    } finally {
+      setBusy(null);
+    }
+  }
   function startEditingKnowledgeSources(item: Knowledge) {
     setEditingKnowledgeSourcesId(item.id);
     setAdditionalSourceDraft((knowledgeSources[item.id] ?? []).filter((id) => id !== item.source_post_id).join(", "));
@@ -192,9 +211,21 @@ export default function AdminPage() {
     if (saved) setEditingKnowledgeSourcesId(null);
   }
   async function publishKnowledge(item: Knowledge) {
-    await runAction(`publish-${item.id}`, () => supabase.rpc("publish_knowledge", { p_knowledge_id: item.id }), "知识条目已发布。");
+    if (item.tags.length !== 1 || !isKnowledgeCategory(item.tags[0])) {
+      setFeedback({ type: "error", text: "发布前请选择一个知识分类。" });
+      return;
+    }
+    await runAction(`publish-${item.id}`, async () => {
+      const saved = await supabase.from("knowledge_entries").update({ title: item.title, summary: item.summary, scenario: item.scenario, steps: item.steps, conclusions: item.conclusions, limitations: item.limitations, tags: item.tags }).eq("id", item.id);
+      if (saved.error) return saved;
+      return supabase.rpc("publish_knowledge", { p_knowledge_id: item.id });
+    }, "知识条目已审核发布。");
   }
   async function saveKnowledge(item: Knowledge) {
+    if (item.tags.length > 1 || (item.tags.length === 1 && !isKnowledgeCategory(item.tags[0])) || (item.status === "published" && item.tags.length !== 1)) {
+      setFeedback({ type: "error", text: "知识只能选择一个固定分类。" });
+      return;
+    }
     const saved = await runAction(`save-knowledge-${item.id}`, () => supabase.from("knowledge_entries").update({ title: item.title, summary: item.summary, scenario: item.scenario, steps: item.steps, conclusions: item.conclusions, limitations: item.limitations, tags: item.tags }).eq("id", item.id), item.status === "published" ? "知识条目已更新并保持发布。" : "知识草稿已保存。");
     if (saved && item.status === "published") {
       setEditingKnowledgeId(null);
@@ -448,7 +479,7 @@ export default function AdminPage() {
         </article>)}</div>
       </section>
 
-      <section className="mt-8"><div className="mb-4"><h2 className="text-xl font-bold">知识发布</h2><p className="mt-1 text-sm text-slate-500 dark:text-slate-400">编辑草稿或已发布内容；已发布条目的修改会即时生效。</p></div>
+      <section id="knowledge-publishing" className="mt-8 scroll-mt-6"><div className="mb-4 flex flex-wrap items-start justify-between gap-3"><div><h2 className="text-xl font-bold">知识发布</h2><p className="mt-1 text-sm text-slate-500 dark:text-slate-400">AI 从已发布讨论整理知识草稿；核对来源、分类和内容后再发布。已发布条目的修改会即时生效。</p></div><button type="button" disabled={busy !== null} onClick={() => void generateKnowledge()} className={primaryButtonClass}>{busy === "knowledge-generate" ? "正在整理讨论…" : "AI 生成知识草稿"}</button></div>
         <div className="space-y-3">{knowledge.length === 0 ? <p className={`${panelClass} p-8 text-center text-sm text-slate-500`}>暂无知识条目，可从已发布帖子中整理创建。</p> : knowledge.map((item) => <article key={item.id} className={`${panelClass} p-4 sm:p-5`}>
           <div className="flex flex-wrap items-center justify-between gap-3"><div><span className="text-xs text-slate-500">知识条目</span><Link href={`/knowledge/${item.id}`} className="mt-1 block font-semibold hover:text-blue-600 dark:hover:text-blue-400">{item.title}</Link></div><span className={`rounded px-2 py-1 text-xs ${item.status === "published" ? "bg-green-100 text-green-700 dark:bg-green-950/50 dark:text-green-200" : "bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-200"}`}>{item.status === "published" ? "已发布" : "草稿"}</span></div>
           <div className="mt-3 rounded-lg bg-slate-50 px-3 py-3 text-sm dark:bg-slate-800/60">
@@ -456,7 +487,16 @@ export default function AdminPage() {
             {editingKnowledgeSourcesId === item.id && <div className="mt-3 space-y-2"><p className="text-xs text-slate-500 dark:text-slate-400">主来源 #{item.source_post_id ?? "无"} 保留。输入其他已发布帖子的 ID，最多 9 条，用逗号分隔；留空会移除补充来源。</p><input aria-label="补充来源帖子 ID" value={additionalSourceDraft} onChange={(event) => setAdditionalSourceDraft(event.target.value)} className={fieldClass} placeholder="例如：36, 38" /><div className="flex gap-2"><button type="button" disabled={busy !== null} onClick={() => void saveKnowledgeSources(item)} className={secondaryButtonClass}>{busy === `sources-${item.id}` ? "保存中…" : "保存来源"}</button><button type="button" disabled={busy !== null} onClick={() => setEditingKnowledgeSourcesId(null)} className={secondaryButtonClass}>取消</button></div></div>}
           </div>
           {item.status === "published" && editingKnowledgeId !== item.id && <button type="button" disabled={busy !== null} onClick={() => startEditingKnowledge(item)} className={`${secondaryButtonClass} mt-4`}>编辑知识</button>}
-          {(item.status === "draft" || editingKnowledgeId === item.id) && <div className="mt-4 grid gap-3 border-t border-slate-200 pt-4 dark:border-slate-700 md:grid-cols-2"><input aria-label="知识标题" value={item.title} onChange={(event) => setKnowledge((items) => items.map((value) => value.id === item.id ? { ...value, title: event.target.value } : value))} className={fieldClass} placeholder="标题" /><input aria-label="知识摘要" value={item.summary} onChange={(event) => setKnowledge((items) => items.map((value) => value.id === item.id ? { ...value, summary: event.target.value } : value))} className={fieldClass} placeholder="摘要" /><textarea aria-label="适用场景" value={item.scenario} onChange={(event) => setKnowledge((items) => items.map((value) => value.id === item.id ? { ...value, scenario: event.target.value } : value))} className={`${fieldClass} min-h-24 resize-y md:col-span-2`} placeholder="适用场景" /><textarea aria-label="操作步骤" value={item.steps} onChange={(event) => setKnowledge((items) => items.map((value) => value.id === item.id ? { ...value, steps: event.target.value } : value))} className={`${fieldClass} min-h-28 resize-y`} placeholder="操作步骤" /><textarea aria-label="结论与效果" value={item.conclusions} onChange={(event) => setKnowledge((items) => items.map((value) => value.id === item.id ? { ...value, conclusions: event.target.value } : value))} className={`${fieldClass} min-h-28 resize-y`} placeholder="结论 / 效果" /><textarea aria-label="限制条件" value={item.limitations} onChange={(event) => setKnowledge((items) => items.map((value) => value.id === item.id ? { ...value, limitations: event.target.value } : value))} className={`${fieldClass} min-h-24 resize-y md:col-span-2`} placeholder="限制条件" /><input aria-label="知识标签" value={item.tags.join(", ")} onChange={(event) => setKnowledge((items) => items.map((value) => value.id === item.id ? { ...value, tags: event.target.value.split(",").map((tag) => tag.trim()).filter(Boolean) } : value))} className={`${fieldClass} md:col-span-2`} placeholder="标签，用逗号分隔" /><div className="flex flex-wrap gap-2 md:col-span-2"><button type="button" disabled={busy !== null} onClick={() => void saveKnowledge(item)} className={item.status === "published" ? primaryButtonClass : secondaryButtonClass}>{busy === `save-knowledge-${item.id}` ? "保存中…" : item.status === "published" ? "保存修改" : "保存草稿"}</button>{item.status === "draft" ? <button type="button" disabled={busy !== null} onClick={() => void publishKnowledge(item)} className={primaryButtonClass}>{busy === `publish-${item.id}` ? "发布中…" : "预览确认并发布"}</button> : <button type="button" disabled={busy !== null} onClick={() => cancelEditingKnowledge(item)} className={secondaryButtonClass}>取消编辑</button>}</div></div>}
+          {(item.status === "draft" || editingKnowledgeId === item.id) && <div className="mt-4 grid gap-3 border-t border-slate-200 pt-4 dark:border-slate-700 md:grid-cols-2">
+            <input aria-label="知识标题" value={item.title} onChange={(event) => setKnowledge((items) => items.map((value) => value.id === item.id ? { ...value, title: event.target.value } : value))} className={fieldClass} placeholder="标题" />
+            <input aria-label="知识摘要" value={item.summary} onChange={(event) => setKnowledge((items) => items.map((value) => value.id === item.id ? { ...value, summary: event.target.value } : value))} className={fieldClass} placeholder="摘要" />
+            <textarea aria-label="适用场景" value={item.scenario} onChange={(event) => setKnowledge((items) => items.map((value) => value.id === item.id ? { ...value, scenario: event.target.value } : value))} className={`${fieldClass} min-h-24 resize-y md:col-span-2`} placeholder="适用场景" />
+            <textarea aria-label="操作步骤" value={item.steps} onChange={(event) => setKnowledge((items) => items.map((value) => value.id === item.id ? { ...value, steps: event.target.value } : value))} className={`${fieldClass} min-h-28 resize-y`} placeholder="操作步骤" />
+            <textarea aria-label="结论与效果" value={item.conclusions} onChange={(event) => setKnowledge((items) => items.map((value) => value.id === item.id ? { ...value, conclusions: event.target.value } : value))} className={`${fieldClass} min-h-28 resize-y`} placeholder="结论 / 效果" />
+            <textarea aria-label="限制条件" value={item.limitations} onChange={(event) => setKnowledge((items) => items.map((value) => value.id === item.id ? { ...value, limitations: event.target.value } : value))} className={`${fieldClass} min-h-24 resize-y md:col-span-2`} placeholder="限制条件" />
+            <label className="grid gap-1 text-sm text-slate-600 dark:text-slate-300 md:col-span-2">知识分类<select aria-label="知识分类" value={item.tags[0] ?? ""} onChange={(event) => setKnowledge((items) => items.map((value) => value.id === item.id ? { ...value, tags: event.target.value ? [event.target.value] : [] } : value))} className={fieldClass}><option value="">请选择分类</option>{knowledgeCategories.map((category) => <option key={category} value={category}>{category}</option>)}</select></label>
+            <div className="flex flex-wrap gap-2 md:col-span-2"><button type="button" disabled={busy !== null} onClick={() => void saveKnowledge(item)} className={item.status === "published" ? primaryButtonClass : secondaryButtonClass}>{busy === `save-knowledge-${item.id}` ? "保存中…" : item.status === "published" ? "保存修改" : "保存草稿"}</button>{item.status === "draft" ? <button type="button" disabled={busy !== null} onClick={() => void publishKnowledge(item)} className={primaryButtonClass}>{busy === `publish-${item.id}` ? "发布中…" : "审核并发布"}</button> : <button type="button" disabled={busy !== null} onClick={() => cancelEditingKnowledge(item)} className={secondaryButtonClass}>取消编辑</button>}</div>
+          </div>}
         </article>)}</div>
       </section>
 
