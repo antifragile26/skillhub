@@ -11,6 +11,7 @@ type PendingPost = { id: number; title: string; content: string; author: string;
 type SkillReview = { id: number; name: string; version: string | null; description: string | null; category: string | null; created_at: string; submitted_at: string | null; package_name: string | null; package_size: number | null; user_id: string | null; status?: string; deleted_at?: string | null };
 type Report = { id: string; target_type: string; target_id: string; reason: string; status: string; created_at: string };
 type Knowledge = { id: string; title: string; status: string; source_post_id?: number | null; summary: string; scenario: string; steps: string; conclusions: string; limitations: string; tags: string[] };
+type KnowledgeSource = { knowledge_id: string; post_id: number; position: number };
 type Collection = { id: string; name: string; description: string; status: string };
 type Stats = Record<string, number>;
 type Feedback = { type: "success" | "error" | "info"; text: string };
@@ -31,6 +32,9 @@ export default function AdminPage() {
   const [postCount, setPostCount] = useState(0);
   const [reports, setReports] = useState<Report[]>([]);
   const [knowledge, setKnowledge] = useState<Knowledge[]>([]);
+  const [knowledgeSources, setKnowledgeSources] = useState<Record<string, number[]>>({});
+  const [editingKnowledgeSourcesId, setEditingKnowledgeSourcesId] = useState<string | null>(null);
+  const [additionalSourceDraft, setAdditionalSourceDraft] = useState("");
   const [editingKnowledgeId, setEditingKnowledgeId] = useState<string | null>(null);
   const [knowledgeEditOriginal, setKnowledgeEditOriginal] = useState<Knowledge | null>(null);
   const [collections, setCollections] = useState<Collection[]>([]);
@@ -64,7 +68,16 @@ export default function AdminPage() {
       supabase.from("skills").select("id,name,version,description,category,created_at,submitted_at,package_name,package_size,user_id").eq("status", "pending").order("submitted_at", { ascending: true }).limit(20),
       supabase.from("skills").select("id,name,version,description,category,created_at,submitted_at,package_name,package_size,user_id,status,deleted_at").or("status.eq.published,deleted_at.not.is.null").order("updated_at", { ascending: false }).limit(100),
     ]);
-    setPosts((postResult.data ?? []) as PendingPost[]); setPostCount(postResult.count ?? 0); setReports((reportResult.data ?? []) as Report[]); setKnowledge((knowledgeResult.data ?? []) as Knowledge[]); setCollections((collectionsResult.data ?? []) as Collection[]);
+    const knowledgeRows = (knowledgeResult.data ?? []) as Knowledge[];
+    const sourceResult = knowledgeRows.length > 0
+      ? await supabase.from("knowledge_post_sources").select("knowledge_id,post_id,position").in("knowledge_id", knowledgeRows.map((item) => item.id)).order("position", { ascending: true })
+      : { data: [] };
+    const sourceMap: Record<string, number[]> = {};
+    for (const source of (sourceResult.data ?? []) as KnowledgeSource[]) {
+      sourceMap[source.knowledge_id] ??= [];
+      sourceMap[source.knowledge_id].push(source.post_id);
+    }
+    setPosts((postResult.data ?? []) as PendingPost[]); setPostCount(postResult.count ?? 0); setReports((reportResult.data ?? []) as Report[]); setKnowledge(knowledgeRows); setKnowledgeSources(sourceMap); setCollections((collectionsResult.data ?? []) as Collection[]);
     setSkillReviews((skillResult.data ?? []) as SkillReview[]); setSkillReviewError(skillResult.error ? `Skill 审核队列加载失败：${skillResult.error.message}` : "");
     setManagedSkills((managedSkillResult.data ?? []) as SkillReview[]);
     const now = new Date(); const from = new Date(now); from.setDate(now.getDate() - 7); const statResult = await supabase.rpc("get_forum_stats", { p_from: from.toISOString(), p_to: now.toISOString() }); if (!statResult.error) setStats((statResult.data ?? null) as Stats | null);
@@ -151,6 +164,20 @@ export default function AdminPage() {
   }
   async function createKnowledge(post: PendingPost) {
     await runAction(`knowledge-${post.id}`, () => supabase.rpc("create_knowledge_from_post", { p_post_id: post.id }), "知识草稿已创建，可继续编辑后发布。");
+  }
+  function startEditingKnowledgeSources(item: Knowledge) {
+    setEditingKnowledgeSourcesId(item.id);
+    setAdditionalSourceDraft((knowledgeSources[item.id] ?? []).filter((id) => id !== item.source_post_id).join(", "));
+  }
+  async function saveKnowledgeSources(item: Knowledge) {
+    const parts = additionalSourceDraft.trim() ? additionalSourceDraft.trim().split(/[,，\s]+/) : [];
+    const ids = parts.map(Number);
+    if (ids.length > 9 || ids.some((id) => !Number.isSafeInteger(id) || id <= 0)) {
+      setFeedback({ type: "error", text: "请输入最多 9 个有效帖子 ID，用逗号分隔。" });
+      return;
+    }
+    const saved = await runAction(`sources-${item.id}`, () => supabase.rpc("set_knowledge_post_sources", { p_knowledge_id: item.id, p_additional_post_ids: ids }), "来源帖子已更新。" );
+    if (saved) setEditingKnowledgeSourcesId(null);
   }
   async function publishKnowledge(item: Knowledge) {
     await runAction(`publish-${item.id}`, () => supabase.rpc("publish_knowledge", { p_knowledge_id: item.id }), "知识条目已发布。");
@@ -340,6 +367,10 @@ export default function AdminPage() {
       <section className="mt-8"><div className="mb-4"><h2 className="text-xl font-bold">知识发布</h2><p className="mt-1 text-sm text-slate-500 dark:text-slate-400">编辑草稿或已发布内容；已发布条目的修改会即时生效。</p></div>
         <div className="space-y-3">{knowledge.length === 0 ? <p className={`${panelClass} p-8 text-center text-sm text-slate-500`}>暂无知识条目，可从已发布帖子中整理创建。</p> : knowledge.map((item) => <article key={item.id} className={`${panelClass} p-4 sm:p-5`}>
           <div className="flex flex-wrap items-center justify-between gap-3"><div><span className="text-xs text-slate-500">知识条目</span><Link href={`/knowledge/${item.id}`} className="mt-1 block font-semibold hover:text-blue-600 dark:hover:text-blue-400">{item.title}</Link></div><span className={`rounded px-2 py-1 text-xs ${item.status === "published" ? "bg-green-100 text-green-700 dark:bg-green-950/50 dark:text-green-200" : "bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-200"}`}>{item.status === "published" ? "已发布" : "草稿"}</span></div>
+          <div className="mt-3 rounded-lg bg-slate-50 px-3 py-3 text-sm dark:bg-slate-800/60">
+            <div className="flex flex-wrap items-center gap-2"><span className="text-slate-500 dark:text-slate-400">来源帖子：</span>{(knowledgeSources[item.id] ?? (item.source_post_id ? [item.source_post_id] : [])).map((postId) => <Link key={postId} href={`/forum/${postId}`} className="text-blue-600 hover:underline dark:text-blue-400">#{postId}</Link>)}<button type="button" disabled={busy !== null} onClick={() => startEditingKnowledgeSources(item)} className="ml-auto text-sm font-medium text-blue-600 hover:underline dark:text-blue-400">管理来源</button></div>
+            {editingKnowledgeSourcesId === item.id && <div className="mt-3 space-y-2"><p className="text-xs text-slate-500 dark:text-slate-400">主来源 #{item.source_post_id ?? "无"} 保留。输入其他已发布帖子的 ID，最多 9 条，用逗号分隔；留空会移除补充来源。</p><input aria-label="补充来源帖子 ID" value={additionalSourceDraft} onChange={(event) => setAdditionalSourceDraft(event.target.value)} className={fieldClass} placeholder="例如：36, 38" /><div className="flex gap-2"><button type="button" disabled={busy !== null} onClick={() => void saveKnowledgeSources(item)} className={secondaryButtonClass}>{busy === `sources-${item.id}` ? "保存中…" : "保存来源"}</button><button type="button" disabled={busy !== null} onClick={() => setEditingKnowledgeSourcesId(null)} className={secondaryButtonClass}>取消</button></div></div>}
+          </div>
           {item.status === "published" && editingKnowledgeId !== item.id && <button type="button" disabled={busy !== null} onClick={() => startEditingKnowledge(item)} className={`${secondaryButtonClass} mt-4`}>编辑知识</button>}
           {(item.status === "draft" || editingKnowledgeId === item.id) && <div className="mt-4 grid gap-3 border-t border-slate-200 pt-4 dark:border-slate-700 md:grid-cols-2"><input aria-label="知识标题" value={item.title} onChange={(event) => setKnowledge((items) => items.map((value) => value.id === item.id ? { ...value, title: event.target.value } : value))} className={fieldClass} placeholder="标题" /><input aria-label="知识摘要" value={item.summary} onChange={(event) => setKnowledge((items) => items.map((value) => value.id === item.id ? { ...value, summary: event.target.value } : value))} className={fieldClass} placeholder="摘要" /><textarea aria-label="适用场景" value={item.scenario} onChange={(event) => setKnowledge((items) => items.map((value) => value.id === item.id ? { ...value, scenario: event.target.value } : value))} className={`${fieldClass} min-h-24 resize-y md:col-span-2`} placeholder="适用场景" /><textarea aria-label="操作步骤" value={item.steps} onChange={(event) => setKnowledge((items) => items.map((value) => value.id === item.id ? { ...value, steps: event.target.value } : value))} className={`${fieldClass} min-h-28 resize-y`} placeholder="操作步骤" /><textarea aria-label="结论与效果" value={item.conclusions} onChange={(event) => setKnowledge((items) => items.map((value) => value.id === item.id ? { ...value, conclusions: event.target.value } : value))} className={`${fieldClass} min-h-28 resize-y`} placeholder="结论 / 效果" /><textarea aria-label="限制条件" value={item.limitations} onChange={(event) => setKnowledge((items) => items.map((value) => value.id === item.id ? { ...value, limitations: event.target.value } : value))} className={`${fieldClass} min-h-24 resize-y md:col-span-2`} placeholder="限制条件" /><input aria-label="知识标签" value={item.tags.join(", ")} onChange={(event) => setKnowledge((items) => items.map((value) => value.id === item.id ? { ...value, tags: event.target.value.split(",").map((tag) => tag.trim()).filter(Boolean) } : value))} className={`${fieldClass} md:col-span-2`} placeholder="标签，用逗号分隔" /><div className="flex flex-wrap gap-2 md:col-span-2"><button type="button" disabled={busy !== null} onClick={() => void saveKnowledge(item)} className={item.status === "published" ? primaryButtonClass : secondaryButtonClass}>{busy === `save-knowledge-${item.id}` ? "保存中…" : item.status === "published" ? "保存修改" : "保存草稿"}</button>{item.status === "draft" ? <button type="button" disabled={busy !== null} onClick={() => void publishKnowledge(item)} className={primaryButtonClass}>{busy === `publish-${item.id}` ? "发布中…" : "预览确认并发布"}</button> : <button type="button" disabled={busy !== null} onClick={() => cancelEditingKnowledge(item)} className={secondaryButtonClass}>取消编辑</button>}</div></div>}
         </article>)}</div>

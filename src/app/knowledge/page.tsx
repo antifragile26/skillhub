@@ -13,6 +13,11 @@ export default async function KnowledgePage({ searchParams }: { searchParams: Pr
   if (params.tag) request = request.contains("tags", [params.tag]);
   const { data, error } = await request;
   const entries = data ?? [];
+  const sourceCounts = new Map<string, number>();
+  if (entries.length > 0) {
+    const sources = await supabase.from("knowledge_post_sources").select("knowledge_id").in("knowledge_id", entries.map((entry) => entry.id));
+    for (const source of sources.data ?? []) sourceCounts.set(source.knowledge_id, (sourceCounts.get(source.knowledge_id) ?? 0) + 1);
+  }
   const tagSet = Array.from(new Set(entries.flatMap((entry) => entry.tags ?? []))).slice(0, 20);
 
   return <main className="hub-page">
@@ -20,7 +25,7 @@ export default async function KnowledgePage({ searchParams }: { searchParams: Pr
       <form className="hub-surface mt-8 flex gap-3 p-4" method="get"><label htmlFor="knowledge-q" className="sr-only">搜索知识</label><input id="knowledge-q" name="q" defaultValue={query} placeholder="搜索标题、摘要或场景" className="hub-input min-w-0 flex-1" /><button className="hub-button-primary">搜索</button></form>
       {tagSet.length > 0 && <div className="mt-4 flex flex-wrap gap-2 text-sm"><Link href="/knowledge" className={`rounded-full px-3 py-1 ${!params.tag ? "bg-blue-600 text-white" : "border border-zinc-300 dark:border-zinc-700"}`}>全部</Link>{tagSet.map((tag) => <Link key={tag} href={`/knowledge?tag=${encodeURIComponent(tag)}`} className={`rounded-full px-3 py-1 ${params.tag === tag ? "bg-blue-600 text-white" : "border border-zinc-300 dark:border-zinc-700"}`}>#{tag}</Link>)}</div>}
       {error && <p className="mt-6 rounded-md bg-amber-50 p-4 text-sm text-amber-800">知识库暂时无法加载。</p>}
-      <div className="mt-8 grid gap-4 md:grid-cols-2">{entries.length === 0 ? <p className="hub-surface col-span-full py-12 text-center text-sm hub-muted">暂无匹配的已发布知识。</p> : entries.map((entry) => <article key={entry.id} className="hub-surface p-5 transition hover:border-[var(--accent)]"><Link href={`/knowledge/${entry.id}`} className="block"><div className="flex items-start justify-between gap-3"><h2 className="text-lg font-semibold">{entry.title}</h2>{entry.needs_review && <span className="text-xs text-amber-600">来源待核对</span>}</div><p className="mt-2 line-clamp-3 text-sm hub-muted">{entry.summary || entry.scenario || "暂无摘要"}</p></Link><div className="mt-4 flex flex-wrap gap-2 text-xs hub-muted"><span>{entry.source_author || "社区作者"}</span>{entry.source_post_id && <Link href={`/forum/${entry.source_post_id}`} className="text-[var(--accent-strong)] hover:underline">· 查看来源帖子 #{entry.source_post_id}</Link>}{(entry.tags ?? []).map((tag: string) => <span key={tag} className="hub-chip">#{tag}</span>)}</div></article>)}</div>
+      <div className="mt-8 grid gap-4 md:grid-cols-2">{entries.length === 0 ? <p className="hub-surface col-span-full py-12 text-center text-sm hub-muted">暂无匹配的已发布知识。</p> : entries.map((entry) => <article key={entry.id} className="hub-surface p-5 transition hover:border-[var(--accent)]"><Link href={`/knowledge/${entry.id}`} className="block"><div className="flex items-start justify-between gap-3"><h2 className="text-lg font-semibold">{entry.title}</h2>{entry.needs_review && <span className="text-xs text-amber-600">来源待核对</span>}</div><p className="mt-2 line-clamp-3 text-sm hub-muted">{entry.summary || entry.scenario || "暂无摘要"}</p></Link><div className="mt-4 flex flex-wrap gap-2 text-xs hub-muted"><span>来源：{sourceCounts.get(entry.id) ?? (entry.source_post_id ? 1 : 0)} 条帖子</span>{entry.source_post_id && <Link href={`/forum/${entry.source_post_id}`} className="text-[var(--accent-strong)] hover:underline">· 查看主来源 #{entry.source_post_id}</Link>}{(entry.tags ?? []).map((tag: string) => <span key={tag} className="hub-chip">#{tag}</span>)}</div></article>)}</div>
     </div>
   </main>;
 }

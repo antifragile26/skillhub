@@ -79,12 +79,16 @@ export default function PostDetailPage() {
       setComments(loadedComments);
 
       const relatedCategoryValues = categoryFilterValues(value.category);
-      const [related, linkResult, knowledgeResult] = await Promise.all([
+      const [related, linkResult, knowledgeSourceResult] = await Promise.all([
         relatedCategoryValues.length ? supabase.from("posts").select("id,title,category,author,created_at").in("category", relatedCategoryValues).eq("status", "published").is("deleted_at", null).neq("id", postId).order("created_at", { ascending: false }).limit(5) : Promise.resolve({ data: [] }),
         supabase.from("content_product_links").select("id,content_id,product_type,product_id").eq("content_type", "post").eq("content_id", postId),
-        supabase.from("knowledge_entries").select("id,title").eq("source_post_id", Number(postId)).eq("status", "published").is("deleted_at", null),
+        supabase.from("knowledge_post_sources").select("knowledge_id").eq("post_id", Number(postId)),
       ]);
       setRelatedPosts((related.data ?? []) as RelatedPost[]);
+      const knowledgeIds = (knowledgeSourceResult.data ?? []).map((source) => source.knowledge_id);
+      const knowledgeResult = knowledgeIds.length > 0
+        ? await supabase.from("knowledge_entries").select("id,title").in("id", knowledgeIds).eq("status", "published").is("deleted_at", null)
+        : await supabase.from("knowledge_entries").select("id,title").eq("source_post_id", Number(postId)).eq("status", "published").is("deleted_at", null);
       setKnowledgeEntries((knowledgeResult.data ?? []) as KnowledgeEntryLink[]);
       const loadedLinks = (linkResult.data ?? []) as ProductLink[];
       setLinks(loadedLinks);
