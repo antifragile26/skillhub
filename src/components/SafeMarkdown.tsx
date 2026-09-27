@@ -9,11 +9,34 @@ function safeHref(value: string) {
   }
 }
 
+function safeImageHref(value: string) {
+  const href = safeHref(value);
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  if (!href || !supabaseUrl) return null;
+  try {
+    const imageUrl = new URL(href);
+    const expectedOrigin = new URL(supabaseUrl).origin;
+    return imageUrl.origin === expectedOrigin && imageUrl.pathname.startsWith("/storage/v1/object/public/forum-attachments/")
+      ? imageUrl.toString()
+      : null;
+  } catch {
+    return null;
+  }
+}
+
 function InlineMarkdown({ text }: { text: string }) {
-  const parts = text.split(/(\*\*[^*]+\*\*|`[^`]+`|\[[^\]]+\]\([^\s)]+\))/g);
+  const parts = text.split(/(!\[[^\]]*\]\([^\s)]+\)|\*\*[^*]+\*\*|`[^`]+`|\[[^\]]+\]\([^\s)]+\))/g);
   return (
     <>
       {parts.map((part, index) => {
+        const image = part.match(/^!\[([^\]]*)\]\(([^\s)]+)\)$/);
+        if (image) {
+          const src = safeImageHref(image[2]);
+          if (src) return (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img key={index} src={src} alt={image[1]} loading="lazy" decoding="async" className="my-3 max-h-[560px] max-w-full rounded-xl object-contain" />
+          );
+        }
         const strong = part.match(/^\*\*(.+)\*\*$/);
         if (strong) return <strong key={index}>{strong[1]}</strong>;
         const code = part.match(/^`([^`]+)`$/);
