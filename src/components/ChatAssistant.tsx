@@ -2,18 +2,40 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
+import Link from "next/link";
 
+type ChatSource = { type: "skill" | "post" | "knowledge" | "collection"; id: string; title: string; excerpt: string; href: string };
+type BrowseLink = { label: string; href: string };
 type ChatMessage = {
   role: "user" | "assistant";
   content: string;
+  sources?: ChatSource[];
+  browseLinks?: BrowseLink[];
 };
 
-const suggestions = ["SkillHub 能做什么？", "如何发布和分享 Skill？", "帮我整理一条 Skill 使用经验"];
+const suggestions = ["帮我找一个适合整理周报的 Skill", "找找和 Agent 工作流排错有关的讨论", "SkillHub 里有哪些知识专题？"];
 
 const welcomeMessage: ChatMessage = {
   role: "assistant",
-  content: "你好！我是 SkillHub 助手，可以帮你了解站内功能、整理 Skill 使用经验或改进技能说明。",
+  content: "你好！我可以帮你找站内 Skill、帖子、知识和专题，也能一起梳理 Skill 使用或 Agent 开发问题。",
 };
+
+function isSafeSource(source: unknown): source is ChatSource {
+  if (!source || typeof source !== "object") return false;
+  const item = source as Partial<ChatSource>;
+  const prefix = item.type === "skill" ? "skills" : item.type === "post" ? "forum" : item.type === "knowledge" ? "knowledge" : item.type === "collection" ? "collections" : "";
+  return Boolean(prefix && typeof item.id === "string" && typeof item.title === "string" && typeof item.excerpt === "string" && typeof item.href === "string" && new RegExp(`^/${prefix}/[A-Za-z0-9_-]+$`).test(item.href));
+}
+
+function isSafeBrowseLink(link: unknown): link is BrowseLink {
+  if (!link || typeof link !== "object") return false;
+  const item = link as Partial<BrowseLink>;
+  return typeof item.label === "string" && ["/skills", "/forum", "/knowledge", "/collections"].includes(item.href ?? "");
+}
+
+function sourceTypeLabel(type: ChatSource["type"]) {
+  return type === "skill" ? "Skill" : type === "post" ? "论坛" : type === "knowledge" ? "知识库" : "专题";
+}
 
 export default function ChatAssistant() {
   const [open, setOpen] = useState(false);
@@ -54,15 +76,20 @@ export default function ChatAssistant() {
       const response = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: nextMessages.slice(-12).filter((message) => message !== welcomeMessage) }),
+        body: JSON.stringify({ messages: nextMessages.slice(-12).filter((message) => message !== welcomeMessage).map(({ role, content }) => ({ role, content })) }),
       });
-      const result = (await response.json()) as { reply?: string; error?: string };
+      const result = (await response.json()) as { reply?: string; error?: string; sources?: ChatSource[]; browseLinks?: BrowseLink[] };
       if (!response.ok) {
         if (response.status === 401) throw new Error("请先登录，再使用 AI 助手。");
         throw new Error(result.error || "暂时无法回复，请稍后重试。");
       }
       if (!result.reply) throw new Error("助手没有返回内容，请重试。");
-      setMessages((current) => [...current, { role: "assistant", content: result.reply! }]);
+      setMessages((current) => [...current, {
+        role: "assistant",
+        content: result.reply!,
+        sources: Array.isArray(result.sources) ? result.sources.filter((source) => isSafeSource(source)) : [],
+        browseLinks: Array.isArray(result.browseLinks) ? result.browseLinks.filter((link) => isSafeBrowseLink(link)) : [],
+      }]);
     } catch (sendError) {
       setError(sendError instanceof Error ? sendError.message : "发送失败，请稍后重试。");
     } finally {
@@ -82,7 +109,7 @@ export default function ChatAssistant() {
               <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/15 text-lg" aria-hidden="true">✦</span>
               <div>
                 <h2 className="text-sm font-semibold">SkillHub AI 助手</h2>
-                <p className="mt-0.5 text-xs text-blue-100">技能交流与案例整理搭档</p>
+                <p className="mt-0.5 text-xs text-blue-100">搜站内内容，聊 Skill 与 Agent</p>
               </div>
             </div>
             <div className="flex items-center gap-1">
@@ -109,13 +136,28 @@ export default function ChatAssistant() {
 
           <div className="flex-1 space-y-4 overflow-y-auto bg-slate-50/80 p-4 dark:bg-slate-950/50" aria-live="polite">
             <p className="mx-auto max-w-[290px] text-center text-[11px] leading-5 text-slate-500 dark:text-slate-400">
-              助手目前不会自动检索论坛或知识库内容；请勿发送密码、密钥等敏感信息。
+              可搜索已发布的 Skill、帖子、知识和专题；问题与命中的公开内容会发送给 AI 服务生成回答。请勿发送密码或密钥。
             </p>
             {messages.map((message, index) => (
               <div key={`${message.role}-${index}`} className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}>
-                <div className={`max-w-[85%] whitespace-pre-wrap break-words rounded-2xl px-3.5 py-2.5 text-sm leading-6 ${message.role === "user" ? "rounded-br-md bg-blue-600 text-white" : "rounded-bl-md border border-slate-200 bg-white text-slate-700 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"}`}>
-                  {message.content}
-                </div>
+                {message.role === "user" ? (
+                  <div className="max-w-[85%] whitespace-pre-wrap break-words rounded-2xl rounded-br-md bg-blue-600 px-3.5 py-2.5 text-sm leading-6 text-white">{message.content}</div>
+                ) : (
+                  <div className="w-full max-w-[92%] space-y-2">
+                    <div className="whitespace-pre-wrap break-words rounded-2xl rounded-bl-md border border-slate-200 bg-white px-3.5 py-2.5 text-sm leading-6 text-slate-700 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200">{message.content}</div>
+                    {message.sources && message.sources.length > 0 && <section aria-label="站内搜索结果" className="space-y-1.5">
+                      <p className="px-1 text-[11px] font-medium text-slate-500 dark:text-slate-400">找到的站内内容</p>
+                      {message.sources.map((source) => <Link key={`${source.type}-${source.id}`} href={source.href} className="block rounded-xl border border-slate-200 bg-white px-3 py-2 transition hover:border-blue-400 dark:border-slate-700 dark:bg-slate-800/80 dark:hover:border-blue-500">
+                        <span className="text-[10px] font-semibold text-blue-700 dark:text-blue-300">{sourceTypeLabel(source.type)}</span>
+                        <span className="ml-2 text-xs font-semibold text-slate-800 dark:text-slate-100">{source.title}</span>
+                        {source.excerpt && <span className="mt-1 block line-clamp-2 text-[11px] leading-5 text-slate-500 dark:text-slate-400">{source.excerpt}</span>}
+                      </Link>)}
+                    </section>}
+                    {message.browseLinks && message.browseLinks.length > 0 && <nav aria-label="继续浏览" className="flex flex-wrap gap-1.5 px-1">
+                      {message.browseLinks.map((link) => <Link key={link.href} href={link.href} className="rounded-full border border-slate-300 px-2.5 py-1 text-[11px] text-slate-600 hover:border-blue-400 hover:text-blue-700 dark:border-slate-700 dark:text-slate-300 dark:hover:border-blue-500 dark:hover:text-blue-300">浏览{link.label}</Link>)}
+                    </nav>}
+                  </div>
+                )}
               </div>
             ))}
             {messages.length === 1 && !pending && (
