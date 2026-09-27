@@ -37,6 +37,20 @@ function sourceTypeLabel(type: ChatSource["type"]) {
   return type === "skill" ? "Skill" : type === "post" ? "论坛" : type === "knowledge" ? "知识库" : "专题";
 }
 
+function renderReplyWithSourceLinks(content: string, sources: ChatSource[] = []) {
+  const sourceByTitle = new Map(sources.map((source) => [source.title.toLocaleLowerCase(), source]));
+  const titles = [...sourceByTitle.keys()].sort((left, right) => right.length - left.length);
+  if (titles.length === 0) return content;
+
+  const titlePattern = new RegExp(`(${titles.map((title) => title.replace(/[|\\{}()[\]^$+*?.]/g, "\\$&")).join("|")})`, "giu");
+  return content.split(titlePattern).map((part, index) => {
+    const source = sourceByTitle.get(part.toLocaleLowerCase());
+    return source
+      ? <Link key={`${source.type}-${source.id}-inline-${index}`} href={source.href} className="font-medium text-blue-700 underline decoration-blue-300 underline-offset-2 hover:text-blue-900 dark:text-blue-300 dark:decoration-blue-700 dark:hover:text-blue-200">{part}</Link>
+      : part;
+  });
+}
+
 export default function ChatAssistant() {
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState("");
@@ -144,7 +158,7 @@ export default function ChatAssistant() {
                   <div className="max-w-[85%] whitespace-pre-wrap break-words rounded-2xl rounded-br-md bg-blue-600 px-3.5 py-2.5 text-sm leading-6 text-white">{message.content}</div>
                 ) : (
                   <div className="w-full max-w-[92%] space-y-2">
-                    <div className="whitespace-pre-wrap break-words rounded-2xl rounded-bl-md border border-slate-200 bg-white px-3.5 py-2.5 text-sm leading-6 text-slate-700 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200">{message.content}</div>
+                    <div className="whitespace-pre-wrap break-words rounded-2xl rounded-bl-md border border-slate-200 bg-white px-3.5 py-2.5 text-sm leading-6 text-slate-700 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200">{renderReplyWithSourceLinks(message.content, message.sources)}</div>
                     {message.sources && message.sources.length > 0 && <section aria-label="站内搜索结果" className="space-y-1.5">
                       <p className="px-1 text-[11px] font-medium text-slate-500 dark:text-slate-400">找到的站内内容</p>
                       {message.sources.map((source) => <Link key={`${source.type}-${source.id}`} href={source.href} className="block rounded-xl border border-slate-200 bg-white px-3 py-2 transition hover:border-blue-400 dark:border-slate-700 dark:bg-slate-800/80 dark:hover:border-blue-500">
