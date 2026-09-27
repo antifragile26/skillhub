@@ -112,7 +112,9 @@ export async function POST() {
           },
           { role: "user", content: JSON.stringify({ knowledge: source, existing_topics: currentTopics }) },
         ],
-        ...(isDeepSeek ? { max_tokens: 900 } : { max_completion_tokens: 900 }),
+        ...(isDeepSeek
+          ? { thinking: { type: "disabled" }, response_format: { type: "json_object" }, max_tokens: 1600 }
+          : { max_completion_tokens: 900 }),
         stream: false,
       }),
       signal: AbortSignal.timeout(60_000),
@@ -122,8 +124,13 @@ export async function POST() {
       console.error("Collection generator provider returned status", upstream.status);
       return respond({ error: "AI 服务暂时不可用，请稍后重试。" }, 502);
     }
-    const completion = (await upstream.json()) as { choices?: Array<{ message?: { content?: unknown } }> };
-    const generated = parseTopic(completion.choices?.[0]?.message?.content);
+    const completion = (await upstream.json()) as { choices?: Array<{ finish_reason?: string; message?: { content?: unknown } }> };
+    const choice = completion.choices?.[0];
+    if (choice?.finish_reason === "length") {
+      console.error("Collection generator output exceeded token limit");
+      return respond({ error: "AI 生成专题时输出被截断，请稍后重试。" }, 502);
+    }
+    const generated = parseTopic(choice?.message?.content);
     if (!generated) return respond({ error: "AI 未返回可用的专题结构，请重试。" }, 502);
     if (!generated.can_generate) return respond({ error: short(generated.reason || "现有知识不足以组成新专题。", 200) }, 422);
     if (typeof generated.name !== "string" || typeof generated.description !== "string" || !Array.isArray(generated.knowledge_ids)) {

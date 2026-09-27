@@ -147,7 +147,9 @@ export async function POST() {
           },
           { role: "user", content: JSON.stringify({ posts: sourcePosts, existing_knowledge: existing }) },
         ],
-        ...(isDeepSeek ? { max_tokens: 2000 } : { max_completion_tokens: 2000 }),
+        ...(isDeepSeek
+          ? { thinking: { type: "disabled" }, response_format: { type: "json_object" }, max_tokens: 2400 }
+          : { max_completion_tokens: 2000 }),
         stream: false,
       }),
       signal: AbortSignal.timeout(60_000),
@@ -157,8 +159,13 @@ export async function POST() {
       console.error("Knowledge generator provider returned status", upstream.status);
       return respond({ error: "AI 服务暂时不可用，请稍后重试。" }, 502);
     }
-    const completion = (await upstream.json()) as { choices?: Array<{ message?: { content?: unknown } }> };
-    const generated = parseGenerated(completion.choices?.[0]?.message?.content);
+    const completion = (await upstream.json()) as { choices?: Array<{ finish_reason?: string; message?: { content?: unknown } }> };
+    const choice = completion.choices?.[0];
+    if (choice?.finish_reason === "length") {
+      console.error("Knowledge generator output exceeded token limit");
+      return respond({ error: "AI 生成知识时输出被截断，请稍后重试。" }, 502);
+    }
+    const generated = parseGenerated(choice?.message?.content);
     if (!generated) return respond({ error: "AI 未返回可用的知识结构，请重试。" }, 502);
     if (!generated.can_generate) {
       return respond({ error: typeof generated.reason === "string" ? text(generated.reason, 200) : "现有帖子不足以形成新的知识。" }, 422);
