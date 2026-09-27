@@ -43,6 +43,19 @@ export function composerCategory(value?: string | null) {
   return normalizeForumCategory(value);
 }
 
+export function categoryForContentType(type: "discussion" | "question" | "case") {
+  if (type === "case") return "showcase";
+  if (type === "discussion") return "skill_exchange";
+  return "question";
+}
+
+export function contentTypeForCategory(value?: string | null): "discussion" | "question" | "case" {
+  const normalized = normalizeForumCategory(value);
+  if (normalized === "question") return "question";
+  if (normalized === "showcase") return "case";
+  return "discussion";
+}
+
 // 由 value 查中文 label；查不到就原样返回。
 export function categoryLabel(value?: string | null) {
   if (!value) return "";
