@@ -13,6 +13,7 @@ type Report = { id: string; target_type: string; target_id: string; reason: stri
 type Knowledge = { id: string; title: string; status: string; source_post_id?: number | null; summary: string; scenario: string; steps: string; conclusions: string; limitations: string; tags: string[] };
 type KnowledgeSource = { knowledge_id: string; post_id: number; position: number };
 type Collection = { id: string; name: string; description: string; status: string };
+type CollectionItem = { collection_id: string; knowledge_id: string; position: number; knowledge: { id: string; title: string; status: string; needs_review: boolean; deleted_at: string | null } | null };
 type Stats = Record<string, number>;
 type Feedback = { type: "success" | "error" | "info"; text: string };
 type ActionResult = { error: { message: string } | null };
@@ -38,6 +39,7 @@ export default function AdminPage() {
   const [editingKnowledgeId, setEditingKnowledgeId] = useState<string | null>(null);
   const [knowledgeEditOriginal, setKnowledgeEditOriginal] = useState<Knowledge | null>(null);
   const [collections, setCollections] = useState<Collection[]>([]);
+  const [collectionItems, setCollectionItems] = useState<Record<string, CollectionItem[]>>({});
   const [stats, setStats] = useState<Stats | null>(null);
   const [feedback, setFeedback] = useState<Feedback | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
@@ -77,14 +79,24 @@ export default function AdminPage() {
       sourceMap[source.knowledge_id] ??= [];
       sourceMap[source.knowledge_id].push(source.post_id);
     }
-    setPosts((postResult.data ?? []) as PendingPost[]); setPostCount(postResult.count ?? 0); setReports((reportResult.data ?? []) as Report[]); setKnowledge(knowledgeRows); setKnowledgeSources(sourceMap); setCollections((collectionsResult.data ?? []) as Collection[]);
+    const collectionRows = (collectionsResult.data ?? []) as Collection[];
+    const collectionItemResult = collectionRows.length > 0
+      ? await supabase.from("knowledge_collection_items").select("collection_id,knowledge_id,position,knowledge:knowledge_entries(id,title,status,needs_review,deleted_at)").in("collection_id", collectionRows.map((item) => item.id)).order("position", { ascending: true })
+      : { data: [], error: null };
+    const itemMap: Record<string, CollectionItem[]> = {};
+    for (const item of (collectionItemResult.data ?? []) as Array<Omit<CollectionItem, "knowledge"> & { knowledge: CollectionItem["knowledge"] | CollectionItem["knowledge"][] }>) {
+      itemMap[item.collection_id] ??= [];
+      itemMap[item.collection_id].push({ ...item, knowledge: Array.isArray(item.knowledge) ? item.knowledge[0] ?? null : item.knowledge });
+    }
+    if (collectionItemResult.error) setFeedback({ type: "error", text: "专题目录加载失败，请刷新后再审核。" });
+    setPosts((postResult.data ?? []) as PendingPost[]); setPostCount(postResult.count ?? 0); setReports((reportResult.data ?? []) as Report[]); setKnowledge(knowledgeRows); setKnowledgeSources(sourceMap); setCollections(collectionRows); setCollectionItems(itemMap);
     setSkillReviews((skillResult.data ?? []) as SkillReview[]); setSkillReviewError(skillResult.error ? `Skill 审核队列加载失败：${skillResult.error.message}` : "");
     setManagedSkills((managedSkillResult.data ?? []) as SkillReview[]);
     const now = new Date(); const from = new Date(now); from.setDate(now.getDate() - 7); const statResult = await supabase.rpc("get_forum_stats", { p_from: from.toISOString(), p_to: now.toISOString() }); if (!statResult.error) setStats((statResult.data ?? null) as Stats | null);
   }, [authorFilter, contentTypeFilter, page, statusFilter]);
 
   function errorMessage(error: unknown) {
-    const message = error instanceof Error ? error.message : "操作失败，请稍后重试。";
+    const message = error instanceof Error ? error.message : error && typeof error === "object" && "message" in error && typeof error.message === "string" ? error.message : "操作失败，请稍后重试。";
     return getSupabaseErrorMessage(message);
   }
 
@@ -206,8 +218,80 @@ export default function AdminPage() {
     const description = window.prompt("专题简介（可选）") ?? "";
     await runAction("collection-create", async () => supabase.from("knowledge_collections").insert({ name: name.trim(), description, status: "draft", created_by: (await supabase.auth.getUser()).data.user?.id }).select("id").single(), "专题草稿已创建。");
   }
+  async function generateCollection() {
+    setBusy("collection-generate");
+    try {
+      const response = await fetch("/api/admin/collections/generate", { method: "POST", credentials: "same-origin" });
+      const result = (await response.json()) as { error?: string; name?: string };
+      if (!response.ok) {
+        setFeedback({ type: "error", text: result.error || "专题生成失败，请稍后重试。" });
+        return;
+      }
+      setFeedback({ type: "success", text: `已生成「${result.name || "新专题"}」草稿，请检查内容和顺序后发布。` });
+      await load();
+    } catch (error) {
+      setFeedback({ type: "error", text: errorMessage(error) });
+    } finally {
+      setBusy(null);
+    }
+  }
+  async function editCollection(collection: Collection) {
+    const name = window.prompt("专题名称（1-80字）", collection.name);
+    if (name === null) return;
+    const trimmedName = name.trim();
+    if (!trimmedName || trimmedName.length > 80) { setFeedback({ type: "error", text: "专题名称需为 1 到 80 字。" }); return; }
+    const description = window.prompt("专题简介", collection.description);
+    if (description === null) return;
+    if (description.length > 2000) { setFeedback({ type: "error", text: "专题简介不能超过 2000 字。" }); return; }
+    await runAction(`collection-edit-${collection.id}`, () => supabase.from("knowledge_collections").update({ name: trimmedName, description: description.trim() }).eq("id", collection.id), "专题草稿已更新。");
+  }
   async function publishCollection(collection: Collection) {
-    await runAction(`collection-${collection.id}`, () => supabase.from("knowledge_collections").update({ status: "published" }).eq("id", collection.id), "专题已发布。");
+    const items = collectionItems[collection.id] ?? [];
+    if (items.length < 2) { setFeedback({ type: "error", text: "专题至少需要两条知识才能发布。" }); return; }
+    if (items.some((item) => !item.knowledge || item.knowledge.status !== "published" || item.knowledge.needs_review || item.knowledge.deleted_at)) {
+      setFeedback({ type: "error", text: "专题中有未发布或待复核的知识，请先调整目录。" });
+      return;
+    }
+    await runAction(`collection-${collection.id}`, async () => {
+      const currentItems = await supabase.from("knowledge_collection_items").select("knowledge_id").eq("collection_id", collection.id);
+      if (currentItems.error) return currentItems;
+      const ids = (currentItems.data ?? []).map((item) => item.knowledge_id);
+      if (ids.length < 2) return { error: { message: "专题至少需要两条知识才能发布。" } };
+      const currentKnowledge = await supabase.from("knowledge_entries").select("id").in("id", ids).eq("status", "published").is("deleted_at", null).eq("needs_review", false);
+      if (currentKnowledge.error) return currentKnowledge;
+      if (currentKnowledge.data?.length !== ids.length) return { error: { message: "专题中有未发布或待复核的知识，请先调整目录。" } };
+      return supabase.from("knowledge_collections").update({ status: "published" }).eq("id", collection.id);
+    }, "专题已审核发布。");
+  }
+  async function discardCollection(collection: Collection) {
+    await runAction(`collection-discard-${collection.id}`, () => supabase.from("knowledge_collections").update({ status: "unpublished" }).eq("id", collection.id), "专题草稿已停用。");
+  }
+  async function removeCollectionItem(collection: Collection, knowledgeId: string) {
+    await runAction(`collection-remove-${collection.id}-${knowledgeId}`, () => supabase.from("knowledge_collection_items").delete().eq("collection_id", collection.id).eq("knowledge_id", knowledgeId), "知识已从专题草稿移除。");
+  }
+  async function moveCollectionItem(collection: Collection, knowledgeId: string, direction: -1 | 1) {
+    const items = collectionItems[collection.id] ?? [];
+    const index = items.findIndex((item) => item.knowledge_id === knowledgeId);
+    const neighbor = items[index + direction];
+    if (index < 0 || !neighbor) return;
+    const current = items[index];
+    const temporaryPosition = Math.max(...items.map((item) => item.position)) + 1;
+    setBusy(`collection-move-${collection.id}`);
+    try {
+      const move = (id: string, position: number) => supabase.from("knowledge_collection_items").update({ position }).eq("collection_id", collection.id).eq("knowledge_id", id);
+      const first = await move(current.knowledge_id, temporaryPosition);
+      if (first.error) throw first.error;
+      const second = await move(neighbor.knowledge_id, current.position);
+      if (second.error) throw second.error;
+      const third = await move(current.knowledge_id, neighbor.position);
+      if (third.error) throw third.error;
+      setFeedback({ type: "success", text: "阅读顺序已更新。" });
+    } catch (error) {
+      setFeedback({ type: "error", text: `调整顺序未完成：${errorMessage(error)}。请核对当前目录。` });
+    } finally {
+      await load();
+      setBusy(null);
+    }
   }
   async function addKnowledgeToCollection(collection: Collection) {
     const knowledgeId = window.prompt("输入要加入的知识条目 UUID");
@@ -376,8 +460,27 @@ export default function AdminPage() {
         </article>)}</div>
       </section>
 
-      <section className={`${panelClass} mt-8 p-4 sm:p-5`}><div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-xl font-bold">专题目录</h2><p className="mt-1 text-sm text-slate-500 dark:text-slate-400">将知识条目组织成主题专题。</p></div><button type="button" disabled={busy !== null} onClick={() => void createCollection()} className={primaryButtonClass}>{busy === "collection-create" ? "创建中…" : "＋ 新建专题"}</button></div>
-        <div className="mt-4 grid gap-3 md:grid-cols-2">{collections.length === 0 ? <p className="rounded-lg border border-dashed border-slate-300 px-5 py-7 text-center text-sm text-slate-500 dark:border-slate-700 md:col-span-2">暂无专题。</p> : collections.map((collection) => <article key={collection.id} className="rounded-lg border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-900/50"><div className="flex items-center justify-between gap-3"><h3 className="font-semibold">{collection.name}</h3><span className={`rounded px-2 py-1 text-xs ${collection.status === "published" ? "bg-green-100 text-green-700 dark:bg-green-950/50 dark:text-green-200" : "bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300"}`}>{collection.status === "published" ? "已发布" : "草稿"}</span></div><p className="mt-2 text-sm text-slate-600 dark:text-slate-400">{collection.description || "暂无简介"}</p><div className="mt-4 flex flex-wrap gap-2"><button type="button" disabled={busy !== null} onClick={() => void addKnowledgeToCollection(collection)} className={secondaryButtonClass}>{busy === `collection-item-${collection.id}` ? "处理中…" : "加入知识"}</button>{collection.status === "draft" && <button type="button" disabled={busy !== null} onClick={() => void publishCollection(collection)} className={primaryButtonClass}>{busy === `collection-${collection.id}` ? "发布中…" : "发布专题"}</button>}</div></article>)}</div>
+      <section className={`${panelClass} mt-8 p-4 sm:p-5`}>
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div><h2 className="text-xl font-bold">专题目录</h2><p className="mt-1 text-sm leading-6 text-slate-500 dark:text-slate-400">AI 从已发布知识中整理阅读顺序，生成草稿后由运营核对并发布。</p></div>
+          <div className="flex flex-wrap gap-2">
+            <button type="button" disabled={busy !== null} onClick={() => void generateCollection()} className={primaryButtonClass}>{busy === "collection-generate" ? "正在整理知识…" : "AI 生成专题草稿"}</button>
+            <button type="button" disabled={busy !== null} onClick={() => void createCollection()} className={secondaryButtonClass}>{busy === "collection-create" ? "创建中…" : "手动新建"}</button>
+          </div>
+        </div>
+        <div className="mt-5 grid gap-3 md:grid-cols-2">
+          {collections.length === 0 ? <p className="rounded-lg border border-dashed border-slate-300 px-5 py-7 text-center text-sm text-slate-500 dark:border-slate-700 md:col-span-2">暂无专题。可先用 AI 整理一份草稿。</p> : collections.map((collection) => {
+            const items = collectionItems[collection.id] ?? [];
+            return <article key={collection.id} className={`rounded-lg border p-4 ${collection.status === "draft" ? "border-blue-200 bg-blue-50/40 dark:border-blue-900/70 dark:bg-blue-950/20" : "border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-900/50"}`}>
+              <div className="flex items-start justify-between gap-3"><h3 className="font-semibold leading-6">{collection.name}</h3><span className={`shrink-0 rounded px-2 py-1 text-xs ${collection.status === "published" ? "bg-green-100 text-green-700 dark:bg-green-950/50 dark:text-green-200" : collection.status === "draft" ? "bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-200" : "bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300"}`}>{collection.status === "published" ? "已发布" : collection.status === "draft" ? "待审核草稿" : "已停用"}</span></div>
+              <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-600 dark:text-slate-400">{collection.description || "暂无简介"}</p>
+              <div className="mt-4 border-t border-slate-200 pt-3 dark:border-slate-700"><p className="text-xs font-semibold text-slate-500 dark:text-slate-400">阅读顺序 · {items.length} 条知识</p>
+                {items.length === 0 ? <p className="mt-2 text-sm text-slate-500">尚未加入知识条目。</p> : <ol className="mt-2 space-y-2">{items.map((item, index) => <li key={item.knowledge_id} className="flex items-start gap-2 text-sm"><span className="min-w-5 text-slate-500">{index + 1}.</span><div className="min-w-0 flex-1"><Link href={`/knowledge/${item.knowledge_id}`} className="font-medium text-blue-700 underline-offset-2 hover:underline dark:text-blue-300">{item.knowledge?.title || item.knowledge_id}</Link>{item.knowledge && (item.knowledge.status !== "published" || item.knowledge.needs_review || item.knowledge.deleted_at) && <span className="ml-2 text-xs text-rose-600">需调整</span>}</div>{collection.status === "draft" && <div className="flex shrink-0 items-center gap-2"><button type="button" aria-label={`将${item.knowledge?.title || "知识"}上移`} disabled={busy !== null || index === 0} onClick={() => void moveCollectionItem(collection, item.knowledge_id, -1)} className="rounded px-1 text-slate-600 hover:bg-slate-200 disabled:opacity-30 dark:text-slate-300 dark:hover:bg-slate-700">↑</button><button type="button" aria-label={`将${item.knowledge?.title || "知识"}下移`} disabled={busy !== null || index === items.length - 1} onClick={() => void moveCollectionItem(collection, item.knowledge_id, 1)} className="rounded px-1 text-slate-600 hover:bg-slate-200 disabled:opacity-30 dark:text-slate-300 dark:hover:bg-slate-700">↓</button><button type="button" disabled={busy !== null} onClick={() => void removeCollectionItem(collection, item.knowledge_id)} className="text-xs text-rose-700 underline-offset-2 hover:underline disabled:opacity-50 dark:text-rose-300">移除</button></div>}</li>)}</ol>}
+              </div>
+              {collection.status === "draft" && <div className="mt-4 flex flex-wrap gap-2"><button type="button" disabled={busy !== null} onClick={() => void editCollection(collection)} className={secondaryButtonClass}>编辑名称与简介</button><button type="button" disabled={busy !== null} onClick={() => void addKnowledgeToCollection(collection)} className={secondaryButtonClass}>加入知识</button><button type="button" disabled={busy !== null} onClick={() => void publishCollection(collection)} className={primaryButtonClass}>{busy === `collection-${collection.id}` ? "发布中…" : "审核并发布"}</button><button type="button" disabled={busy !== null} onClick={() => void discardCollection(collection)} className={dangerButtonClass}>不采用</button></div>}
+            </article>;
+          })}
+        </div>
       </section>
 
       <section className={`${panelClass} mt-8 p-4 sm:p-5`}><h2 className="text-xl font-bold">关联 Skill</h2><p className="mt-1 text-sm text-slate-500 dark:text-slate-400">将帖子或知识关联到 Skill，并查看相关点击。</p><p className="mt-3 rounded-md bg-slate-100 px-3 py-2 text-xs text-slate-600 dark:bg-slate-800 dark:text-slate-300">Skill ID 可从 Skill 详情地址获取；历史 Agent 关联保持原样展示。</p>
