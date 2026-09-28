@@ -46,11 +46,15 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     const { data: file, error: downloadError } = await supabase.storage.from(bucket).download(skill.file_path);
     if (downloadError || !file) return errorResponse("技能包文件不存在或暂时不可用。", 404);
 
-    // 下载由本站代理完成，避免浏览器直接请求私有 Storage 时受跨域或会话影响。
-    void supabase.rpc("increment_skill_downloads", { skill_id: id });
     const filename = safeDownloadName(skill.package_name, id);
     const fallbackName = filename.replace(/[^\x20-\x7E]/g, "_");
     const body = await file.arrayBuffer();
+    // RPC 查询构造器需要 await 才会发起请求；成功记录后再返回文件。
+    const { error: countError } = await supabase.rpc("increment_skill_downloads", { skill_id: id });
+    if (countError) {
+      console.error("Skill download count failed", countError.code);
+      return errorResponse("暂时无法记录下载，请稍后重试。", 503);
+    }
     return new Response(body, {
       status: 200,
       headers: {

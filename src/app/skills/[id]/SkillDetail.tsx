@@ -35,17 +35,24 @@ export default function SkillDetail({ skill }: { skill: Skill }) {
   const [reportReason, setReportReason] = useState("");
   const [reportBusy, setReportBusy] = useState(false);
   const [reportMessage, setReportMessage] = useState("");
+  const [downloadCount, setDownloadCount] = useState(skill.downloads ?? 0);
   const shareInputRef = useRef<HTMLInputElement>(null);
   const repoUrl = skill.repo_url || extractFirstUrl(skill.description);
   const hasFile = !!skill.file_path;
+
+  async function refreshDownloadCount() {
+    const { data, error } = await supabase.from("skills").select("downloads").eq("id", skill.id).maybeSingle();
+    if (!error && data) setDownloadCount(data.downloads ?? 0);
+  }
 
   async function handleDownload() {
     if (hasFile && skill.file_path) {
       // 让浏览器直接处理 Content-Disposition 下载，避免内置浏览器对 Blob 下载卡在“即将完成”。
       window.location.assign(`/api/skills/${encodeURIComponent(String(skill.id))}/download`);
+      window.setTimeout(() => void refreshDownloadCount(), 1500);
+      window.setTimeout(() => void refreshDownloadCount(), 5000);
       return;
     } else if (repoUrl) {
-      await supabase.rpc("increment_skill_downloads", { skill_id: skill.id });
       window.open(repoUrl, "_blank", "noopener,noreferrer");
     }
   }
@@ -186,10 +193,10 @@ export default function SkillDetail({ skill }: { skill: Skill }) {
         </div>}
 
         <div className="hub-surface-soft p-5 text-sm">
-          <div className="flex items-center justify-between py-1">
+          {hasFile && <div className="flex items-center justify-between py-1">
             <span className="text-zinc-500">总下载量</span>
-            <span className="font-semibold">{skill.downloads ?? 0}</span>
-          </div>
+            <span className="font-semibold">{downloadCount}</span>
+          </div>}
           <div className="flex items-center justify-between py-1">
             <span className="text-zinc-500">当前版本</span>
             <span className="font-mono text-xs">{skill.version ?? "0.1.0"}</span>

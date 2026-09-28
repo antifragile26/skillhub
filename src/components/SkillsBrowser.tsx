@@ -4,13 +4,14 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { isSkillCategory, recommendSkillCategory, skillCategoryDefinitions, skillCategoryLabel, type SkillCategoryValue } from "@/lib/skillCategories";
 
-type Skill = {
+export type SkillListItem = {
   id: string | number;
   name: string;
   category?: string | null;
   version?: string | null;
   description?: string | null;
   downloads?: number | null;
+  file_path?: string | null;
   tags?: string[] | null;
   created_at?: string | null;
 };
@@ -21,14 +22,15 @@ const sortLabels: Record<SortKey, string> = {
   latest: "最新发布",
 };
 
-function categoryForSkill(skill: Skill): SkillCategoryValue {
+function categoryForSkill(skill: SkillListItem): SkillCategoryValue {
   if (isSkillCategory(skill.category)) return skill.category;
   return recommendSkillCategory(skill.name, skill.description ?? "", skill.tags ?? []);
 }
 
-export default function SkillsBrowser({ skills }: { skills: Skill[] }) {
+export default function SkillsBrowser({ skills, initialPage, pageSize, isSearch }: { skills: SkillListItem[]; initialPage: number; pageSize: number; isSearch: boolean }) {
   const [selectedCategories, setSelectedCategories] = useState<SkillCategoryValue[]>([]);
   const [sort, setSort] = useState<SortKey>("downloads");
+  const [page, setPage] = useState(initialPage);
 
   // 固定使用任务导向分类，避免分类名称随当前页的零散标签漂移。
   const categories = useMemo(() => {
@@ -44,9 +46,13 @@ export default function SkillsBrowser({ skills }: { skills: Skill[] }) {
         ? current.filter((c) => c !== category)
         : [...current, category],
     );
+    setPage(1);
+    const url = new URL(window.location.href);
+    url.searchParams.delete("page");
+    window.history.replaceState(null, "", url);
   }
 
-  const visibleSkills = useMemo(() => {
+  const sortedSkills = useMemo(() => {
     let list = skills.filter((skill) => {
       let matchesFilter = true;
       if (selectedCategories.length > 0) {
@@ -58,7 +64,8 @@ export default function SkillsBrowser({ skills }: { skills: Skill[] }) {
     });
 
     if (sort === "downloads") {
-      list = [...list].sort((a, b) => (b.downloads ?? 0) - (a.downloads ?? 0));
+      const rank = (skill: SkillListItem) => skill.file_path ? skill.downloads ?? 0 : -1;
+      list = [...list].sort((a, b) => rank(b) - rank(a) || new Date(b.created_at ?? 0).getTime() - new Date(a.created_at ?? 0).getTime());
     } else {
       list = [...list].sort(
         (a, b) =>
@@ -67,6 +74,19 @@ export default function SkillsBrowser({ skills }: { skills: Skill[] }) {
     }
     return list;
   }, [skills, selectedCategories, sort]);
+  const pageCount = Math.max(1, Math.ceil(sortedSkills.length / pageSize));
+  const currentPage = Math.min(page, pageCount);
+  const visibleSkills = sortedSkills.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
+  function changePage(nextPage: number) {
+    const next = Math.max(1, Math.min(nextPage, pageCount));
+    setPage(next);
+    const url = new URL(window.location.href);
+    if (next === 1) url.searchParams.delete("page");
+    else url.searchParams.set("page", String(next));
+    window.history.replaceState(null, "", url);
+    document.getElementById("skill-results")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
 
   return (
     <div className="grid gap-8 lg:grid-cols-[200px_1fr]">
@@ -100,11 +120,17 @@ export default function SkillsBrowser({ skills }: { skills: Skill[] }) {
       </aside>
 
       {/* 右侧：搜索 + 排序 + 列表 */}
-      <div>
+      <div id="skill-results" className="scroll-mt-6">
         <div className="mb-6 flex flex-wrap items-center gap-4">
           <select
             value={sort}
-            onChange={(event) => setSort(event.target.value as SortKey)}
+            onChange={(event) => {
+              setSort(event.target.value as SortKey);
+              setPage(1);
+              const url = new URL(window.location.href);
+              url.searchParams.delete("page");
+              window.history.replaceState(null, "", url);
+            }}
             aria-label="排序方式"
             className="hub-input ml-auto w-auto min-w-36"
           >
@@ -129,7 +155,7 @@ export default function SkillsBrowser({ skills }: { skills: Skill[] }) {
                   <span className="text-xs hub-muted">v{skill.version ?? "0.1.0"}</span>
                 </div>
                 <p className="mt-2 line-clamp-2 text-sm leading-6 hub-muted">{skill.description || "作者暂未填写简介，打开详情了解作品信息。"}</p>
-                <p className="mt-4 text-xs hub-muted">↓ {skill.downloads ?? 0} 次下载 <span className="ml-2 text-[var(--accent-strong)] opacity-0 transition group-hover:opacity-100">查看详情 →</span></p>
+                <p className="mt-4 text-xs hub-muted">{skill.file_path ? `↓ ${skill.downloads ?? 0} 次下载` : "↗ 查看源码与说明"} <span className="ml-2 text-[var(--accent-strong)] opacity-0 transition group-hover:opacity-100">查看详情 →</span></p>
                 <div className="mt-3 flex flex-wrap gap-2">
                   <span className="hub-chip hub-chip-active">{skillCategoryLabel(categoryForSkill(skill))}</span>
                 </div>
@@ -137,6 +163,7 @@ export default function SkillsBrowser({ skills }: { skills: Skill[] }) {
             ))
           )}
         </div>
+        <div className="mt-8 flex flex-wrap items-center justify-between gap-3 text-sm hub-muted"><span>{selectedCategories.length ? `筛选后 ${sortedSkills.length} / ${skills.length} 个 Skill` : `${isSearch ? "当前搜索共" : "共"} ${skills.length} 个已发布 Skill`} · 第 {currentPage} / {pageCount} 页</span><div className="flex gap-2">{currentPage > 1 && <button type="button" onClick={() => changePage(currentPage - 1)} className="hub-button-secondary">上一页</button>}{currentPage < pageCount && <button type="button" onClick={() => changePage(currentPage + 1)} className="hub-button-secondary">下一页</button>}</div></div>
       </div>
     </div>
   );
