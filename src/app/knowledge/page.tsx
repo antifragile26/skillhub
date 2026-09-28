@@ -5,6 +5,16 @@ export const dynamic = "force-dynamic";
 
 type SearchParams = { q?: string; tag?: string };
 
+function KnowledgeIcon({ kind = "book" }: { kind?: "book" | "search" | "source" }) {
+  const common = { fill: "none", stroke: "currentColor", strokeWidth: 1.8, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
+  const paths = kind === "search"
+    ? <><circle cx="10.5" cy="10.5" r="6.5" /><path d="m15.5 15.5 4 4" /></>
+    : kind === "source"
+      ? <><path d="M5 4.5h14v15H5z" /><path d="M8 8h8M8 12h8M8 16h5" /></>
+      : <><path d="M5 5.5A2.5 2.5 0 0 1 7.5 3H19v16H7.5A2.5 2.5 0 0 0 5 21z" /><path d="M5 5.5v15M8.5 7h7" /></>;
+  return <svg aria-hidden="true" viewBox="0 0 24 24" {...common}>{paths}</svg>;
+}
+
 export default async function KnowledgePage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const params = await searchParams;
   const query = params.q?.trim().slice(0, 100) ?? "";
@@ -20,12 +30,12 @@ export default async function KnowledgePage({ searchParams }: { searchParams: Pr
   }
   const tagSet = Array.from(new Set(entries.flatMap((entry) => entry.tags ?? []))).slice(0, 20);
 
-  return <main className="hub-page">
-    <div className="hub-container max-w-6xl py-10 sm:py-12"><div className="flex flex-wrap items-end justify-between gap-4"><div><p className="hub-kicker">从社区讨论沉淀</p><h1 className="hub-page-heading mt-2">知识库</h1><p className="mt-2 text-sm hub-muted">从已审核内容整理的可复用知识，保留来源和作者署名。</p></div><Link href="/forum" className="hub-button-secondary">回到论坛</Link></div>
-      <form className="hub-surface mt-8 flex gap-3 p-4" method="get"><label htmlFor="knowledge-q" className="sr-only">搜索知识</label><input id="knowledge-q" name="q" defaultValue={query} placeholder="搜索标题、摘要或场景" className="hub-input min-w-0 flex-1" /><button className="hub-button-primary">搜索</button></form>
-      {tagSet.length > 0 && <div className="mt-4 flex flex-wrap gap-2 text-sm"><Link href="/knowledge" className={`rounded-full px-3 py-1 ${!params.tag ? "bg-blue-600 text-white" : "border border-zinc-300 dark:border-zinc-700"}`}>全部</Link>{tagSet.map((tag) => <Link key={tag} href={`/knowledge?tag=${encodeURIComponent(tag)}`} className={`rounded-full px-3 py-1 ${params.tag === tag ? "bg-blue-600 text-white" : "border border-zinc-300 dark:border-zinc-700"}`}>#{tag}</Link>)}</div>}
+  return <main className="hub-page knowledge-page">
+    <div className="hub-container max-w-6xl py-7 sm:py-10"><section className="knowledge-hero"><div className="knowledge-hero-copy"><span className="knowledge-hero-mark"><KnowledgeIcon /></span><p className="hub-kicker">从社区讨论沉淀</p><h1 className="hub-page-heading mt-2">知识库</h1><p className="mt-2 text-sm hub-muted">把解决问题的方法整理成下一次可以直接复用的步骤、检查点和限制。</p></div><Link href="/forum" className="knowledge-hero-action"><KnowledgeIcon kind="source" />去论坛找案例</Link></section>
+      <form className="knowledge-search" method="get"><KnowledgeIcon kind="search" /><label htmlFor="knowledge-q" className="sr-only">搜索知识</label><input id="knowledge-q" name="q" defaultValue={query} placeholder="搜索标题、摘要或场景" className="hub-input min-w-0 flex-1" /><button className="hub-button-primary">搜索</button></form>
+      {tagSet.length > 0 && <div className="knowledge-tag-strip" aria-label="知识分类"><Link href="/knowledge" className={`knowledge-tag ${!params.tag ? "knowledge-tag-active" : ""}`}><KnowledgeIcon kind="book" />全部</Link>{tagSet.map((tag) => <Link key={tag} href={`/knowledge?tag=${encodeURIComponent(tag)}`} className={`knowledge-tag ${params.tag === tag ? "knowledge-tag-active" : ""}`}>#{tag}</Link>)}</div>}
       {error && <p className="mt-6 rounded-md bg-amber-50 p-4 text-sm text-amber-800">知识库暂时无法加载。</p>}
-      <div className="mt-8 grid gap-4 md:grid-cols-2">{entries.length === 0 ? <p className="hub-surface col-span-full py-12 text-center text-sm hub-muted">暂无匹配的已发布知识。</p> : entries.map((entry) => <article key={entry.id} className="hub-surface p-5 transition hover:border-[var(--accent)]"><Link href={`/knowledge/${entry.id}`} className="block"><div className="flex items-start justify-between gap-3"><h2 className="text-lg font-semibold">{entry.title}</h2>{entry.needs_review && <span className="text-xs text-amber-600">来源待核对</span>}</div><p className="mt-2 line-clamp-3 text-sm hub-muted">{entry.summary || entry.scenario || "暂无摘要"}</p></Link><div className="mt-4 flex flex-wrap gap-2 text-xs hub-muted"><span>来源：{sourceCounts.get(entry.id) ?? (entry.source_post_id ? 1 : 0)} 条帖子</span>{entry.source_post_id && <Link href={`/forum/${entry.source_post_id}`} className="text-[var(--accent-strong)] hover:underline">· 查看主来源 #{entry.source_post_id}</Link>}{(entry.tags ?? []).map((tag: string) => <span key={tag} className="hub-chip">#{tag}</span>)}</div></article>)}</div>
+      <div className="knowledge-grid grid gap-4 md:grid-cols-2">{entries.length === 0 ? <p className="knowledge-card col-span-full py-12 text-center text-sm hub-muted">暂无匹配的已发布知识。</p> : entries.map((entry) => <article key={entry.id} className="knowledge-card transition"><Link href={`/knowledge/${entry.id}`} className="block"><div className="flex items-start gap-3"><span className="knowledge-card-icon"><KnowledgeIcon /></span><div className="min-w-0 flex-1"><h2 className="text-lg font-semibold">{entry.title}</h2>{entry.needs_review && <span className="text-xs text-amber-600">来源待核对</span>}</div></div><p className="mt-3 line-clamp-3 text-sm hub-muted">{entry.summary || entry.scenario || "暂无摘要"}</p></Link><div className="knowledge-card-meta"><span><KnowledgeIcon kind="source" /> 来源：{sourceCounts.get(entry.id) ?? (entry.source_post_id ? 1 : 0)} 条帖子</span>{entry.source_post_id && <Link href={`/forum/${entry.source_post_id}`} className="knowledge-source-link">查看主来源 #{entry.source_post_id}</Link>}{(entry.tags ?? []).map((tag: string) => <span key={tag} className="hub-chip">#{tag}</span>)}</div></article>)}</div>
     </div>
   </main>;
 }
